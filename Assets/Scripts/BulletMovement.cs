@@ -10,9 +10,9 @@ public class BulletMovement : MonoBehaviour
         transform.Translate(Vector2.down * speed * Time.deltaTime);
     }
 
-    // Optional: Bullet zerstören, wenn es den Bildschirm verlässt
-    private void OnBecameInvisible()
-    {
-        Destroy(gameObject);
-    }
+    //// Optional: Bullet zerstören, wenn es den Bildschirm verlässt
+    //private void OnBecameInvisible()
+    //{
+    //    Destroy(gameObject);
+    //}
 }
