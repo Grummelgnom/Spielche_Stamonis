@@ -141,7 +141,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
         else if (playerIndex == 1)
             scoreP2.Value++;
         // Check for win condition
-        if (scoreP1.Value >= 1 || scoreP2.Value >= 1)
+        if (scoreP1.Value >= 10 || scoreP2.Value >= 10)
         {
             gameState.Value = GameState.Finished; // Finished wird hier gesetzt
         }
