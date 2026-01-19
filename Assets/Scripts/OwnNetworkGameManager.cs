@@ -81,7 +81,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
         if (players.Length >= 2 && players.All(p => p.IsReady))
         {
             gameState.Value = GameState.Playing; // Playing wird hier gesetzt
-            StartCoroutine(OwnBallSpawner.Instance.SpawnBall(5f));
+            //StartCoroutine(OwnBallSpawner.Instance.SpawnBall(5f));
         }
     }
 
@@ -147,7 +147,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
         }
         else
         {
-            StartCoroutine(OwnBallSpawner.Instance.SpawnBall(6f));
+            //StartCoroutine(OwnBallSpawner.Instance.SpawnBall(6f));
         }
     }
 
