@@ -18,7 +18,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
     [SerializeField] private TMP_Text player1NameText;
     [SerializeField] private TMP_Text player2NameText; 
     [SerializeField] private TMP_InputField PlayerNameField;
-    [SerializeField] private Button ReadyButton;
+    [SerializeField] private Button StartButton;
 
     public readonly SyncVar<string> Player1 = new SyncVar<string>();
     public readonly SyncVar<string> Player2 = new SyncVar<string>();
@@ -37,7 +37,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
         if (readyButtonText == null)
             return;
 
-        readyButtonText.text = isReady ? "Ready" : "Unready";
+        readyButtonText.text = isReady ? "Start" : "Unready";
     }
 
 
@@ -91,10 +91,10 @@ public class OwnNetworkGameManager : NetworkBehaviour
         {
             if (player.IsOwner)
             {
-                if(!player.IsReady)  
-                    ReadyButton.image.color = Color.green; 
+                if(!player.IsReady)
+                    StartButton.image.color = Color.green;
                 else  
-                    ReadyButton.image.color = Color.white; 
+                    StartButton.image.color = Color.yellow; 
                 player.SetReadyStateServerRpc(PlayerNameField.text);
                 player.CmdSetReady(!player.IsReady);
             }
