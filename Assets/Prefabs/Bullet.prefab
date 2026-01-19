@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 1007463376301636997}
   - component: {fileID: 2120086377485060999}
   - component: {fileID: -7522432557437074579}
+  - component: {fileID: -5195934806647886553}
   m_Layer: 0
   m_Name: Bullet
   m_TagString: Untagged
@@ -183,7 +184,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584327924323719911
+  _initializedTimestamp: -8584327916039325285
   NetworkObserver: {fileID: 0}
   _enablePrediction: 0
   _predictionType: 0
@@ -222,3 +223,20 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 2120086377485060999}
   _networkObjectCache: {fileID: 2120086377485060999}
+--- !u!114 &-5195934806647886553
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4134115370651068687}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ae11c35b14496848abdaef6b628af16, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _componentIndexCache: 255
+  _addedNetworkObject: {fileID: 2120086377485060999}
+  _networkObjectCache: {fileID: 0}
+  bulletSpeed: 20
+  maxDistance: 20
