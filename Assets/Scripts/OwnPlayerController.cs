@@ -4,8 +4,6 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using static UnityEditor.Searcher.SearcherWindow.Alignment;
-
 
 public class OwnPlayerController : NetworkBehaviour
 {
@@ -15,7 +13,6 @@ public class OwnPlayerController : NetworkBehaviour
 
     private Renderer playerRenderer;
 
-    
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float minY = -4f;
     [SerializeField] private float maxY = 4f;
@@ -26,11 +23,17 @@ public class OwnPlayerController : NetworkBehaviour
     [SerializeField] private InputAction moveAction;
     [SerializeField] private InputAction colorChangeAction;
 
+    [Header("Shooting")]
+    [SerializeField] private InputAction shootAction;
+    [SerializeField] private GameObject bulletPrefab;
+    [SerializeField] private Transform firePoint;
+    private bool wasShootPressed = false;
+
     [Header("Player UI")]
     [SerializeField] private TextMeshPro playerIndexText;
     private PlayerInput _playerInput;
 
-    
+
     #region Inits
     private void OnDisable()
     {
@@ -39,11 +42,12 @@ public class OwnPlayerController : NetworkBehaviour
 
         moveAction?.Disable();
         colorChangeAction?.Disable();
+        shootAction?.Disable();
         if (TimeManager != null)
             TimeManager.OnTick -= OnTick;
     }
 
-    private void Start()    
+    private void Start()
     {
         _playerInput = GetComponent<PlayerInput>();
         StartCoroutine(DelayedIsOwner());
@@ -60,22 +64,19 @@ public class OwnPlayerController : NetworkBehaviour
         Debug.Log($"pi = {pi}, text = {playerIndexText}");
         if (playerIndexText != null && pi != null)
         {
-            int index = pi.playerIndex;              // 0,1,2,...
+            int index = pi.playerIndex;
             playerIndexText.text = $"Player {index}";
         }
 
-        //if (_playerInput != null && playerIndexText != null) {
-        //    int index = _playerInput.playerIndex;
-        //    playerIndexText.text = $"Ich bin Player {index}";
-        //}
-
-        yield return null; // Wait a frame to ensure ownership is set
+        yield return null;
         if (IsOwner)
         {
             ChangeColor(Random.value, Random.value, Random.value);
 
             moveAction?.Enable();
             colorChangeAction?.Enable();
+            shootAction?.Enable();
+            Debug.Log("Owner enabled all actions!");
             if (TimeManager != null)
                 TimeManager.OnTick += OnTick;
         }
@@ -85,15 +86,16 @@ public class OwnPlayerController : NetworkBehaviour
     private void OnTick()
     {
         if (!IsOwner) return;
-             
+
         if (isReady.Value)
         {
-            HandleInput();       
+            HandleInput();
+            HandleShooting();
         }
         else
         {
             CheckForChangeColor();
-        }      
+        }
     }
 
     #region ReadyStateHandling
@@ -114,27 +116,17 @@ public class OwnPlayerController : NetworkBehaviour
         OwnNetworkGameManager.Instance.DisableNameField(Owner, isReady.Value);
         OwnNetworkGameManager.Instance.CheckAndStartGame();
         OwnNetworkGameManager.Instance.RpcUpdateReadyButtonText(isReady.Value);
-
     }
 
-    // Debug.Log, wenn Player ready.
     [ServerRpc]
     public void CmdSetReady(bool ready)
     {
         isReady.Value = ready;
         Debug.Log($"Player {Owner.ClientId} ready: {ready}");
     }
-
     #endregion
 
     #region Movement
-    // Das hier ging so nicht wegen float wenn ich mich nicht irre.
-    /* private void HandleInput()
-    {
-        float input = moveAction.ReadValue<float>();
-        if(input != 0) Move(input);
-    }
-    */
     private void HandleInput()
     {
         Vector2 input = moveAction.ReadValue<Vector2>();
@@ -155,19 +147,62 @@ public class OwnPlayerController : NetworkBehaviour
 
         transform.position = new Vector3(newX, newY, transform.position.z);
     }
+    #endregion
 
+    #region Shooting
+    private void HandleShooting()
+    {
+        // Prüfe ob Space gerade gedrückt wurde (State-Wechsel)
+        bool isShootPressed = shootAction.IsPressed();
 
+        if (isShootPressed && !wasShootPressed)
+        {
+            // Space wurde GERADE gedrückt!
+            Debug.Log($"Client {Owner.ClientId}: Space PRESSED!");
+            ShootServerRpc();
+        }
+
+        // Speichere State für nächsten Tick
+        wasShootPressed = isShootPressed;
+    }
+
+    [ServerRpc]
+    private void ShootServerRpc()
+    {
+        Debug.Log($"Server: Client {Owner.ClientId} shoots!");
+
+        Vector3 spawnPos = firePoint ? firePoint.position : transform.position;
+        Quaternion spawnRot = firePoint ? firePoint.rotation : Quaternion.identity;
+
+        // Erstelle Bullet
+        GameObject bulletObj = Instantiate(bulletPrefab, spawnPos, spawnRot);
+
+        // Initialisiere Bullet
+        BulletController bulletCtrl = bulletObj.GetComponent<BulletController>();
+        if (bulletCtrl != null)
+        {
+            bulletCtrl.InitializeBullet(transform.up);
+        }
+
+        // Spawne als NetworkObject
+        NetworkObject netObj = bulletObj.GetComponent<NetworkObject>();
+        if (netObj != null)
+        {
+            ServerManager.Spawn(bulletObj, Owner);
+            Debug.Log("Bullet spawned!");
+        }
+    }
     #endregion
 
     #region ColorChange
     private void CheckForChangeColor()
     {
         if (!colorChangeAction.triggered) return;
-       
+
         float r = Random.value;
         float g = Random.value;
         float b = Random.value;
-        ChangeColor(r, g, b); 
+        ChangeColor(r, g, b);
     }
 
     [ServerRpc]
@@ -179,7 +214,6 @@ public class OwnPlayerController : NetworkBehaviour
     private void OnColorChanged(Color prevColor, Color newColor, bool asServer)
     {
         playerRenderer.material.color = newColor;
-        //Also possible: playerRenderer.material.color = playerColor.Value;
     }
-#endregion
+    #endregion
 }

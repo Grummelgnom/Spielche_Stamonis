@@ -403,13 +403,33 @@ MonoBehaviour:
     m_SingletonActionBindings:
     - m_Name: 
       m_Id: 6f2502bf-98cb-465e-9f23-8af88caaf028
-      m_Path: <Keyboard>/space
+      m_Path: <Keyboard>/c
       m_Interactions: 
       m_Processors: 
       m_Groups: 
       m_Action: Color Change
       m_Flags: 0
     m_Flags: 0
+  shootAction:
+    m_Name: Shoot
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: 88bbba07-7270-404a-830c-8d724e4d1751
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings:
+    - m_Name: 
+      m_Id: 833534ee-a59d-4bb8-ba5d-e51c0de16f36
+      m_Path: <Keyboard>/space
+      m_Interactions: 
+      m_Processors: 
+      m_Groups: 
+      m_Action: Shoot
+      m_Flags: 0
+    m_Flags: 0
+  bulletPrefab: {fileID: 4134115370651068687, guid: af9c858e2694ee74f95bf4c5f4b7bfda, type: 3}
+  firePoint: {fileID: 0}
+  shootCooldown: 0.3
   playerIndexText: {fileID: 636713386052345080}
 --- !u!114 &3354985067614939379
 MonoBehaviour:
