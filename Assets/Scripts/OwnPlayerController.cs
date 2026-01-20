@@ -11,6 +11,9 @@ public class OwnPlayerController : NetworkBehaviour
     private readonly SyncVar<bool> isReady = new SyncVar<bool>();
     public bool IsReady => isReady.Value;
 
+    [Header("Health")]
+    public readonly SyncVar<int> lives = new SyncVar<int>(3);
+
     private Renderer playerRenderer;
 
     [SerializeField] private float moveSpeed = 5f;
@@ -37,6 +40,19 @@ public class OwnPlayerController : NetworkBehaviour
 
 
     #region Inits
+    public override void OnStartNetwork()
+    {
+        base.OnStartNetwork();
+        lives.OnChange += OnLivesChanged;
+        UpdateLivesUI();
+    }
+
+    public override void OnStopNetwork()
+    {
+        base.OnStopNetwork();
+        lives.OnChange -= OnLivesChanged;
+    }
+
     private void OnDisable()
     {
         playerColor.OnChange -= OnColorChanged;
@@ -83,6 +99,8 @@ public class OwnPlayerController : NetworkBehaviour
             Debug.Log("Owner enabled all actions!");
             if (TimeManager != null)
                 TimeManager.OnTick += OnTick;
+
+            UpdateLivesUI();
         }
     }
     #endregion
@@ -160,17 +178,15 @@ public class OwnPlayerController : NetworkBehaviour
         bool isSinglePressed = shootSingleAction.IsPressed();
         if (isSinglePressed && !wasSinglePressed)
         {
-            Debug.Log($"Client {Owner.ClientId}: Left Mouse PRESSED!");
-            ShootServerRpc(1); // Pattern 1 = Single
+            ShootServerRpc(1);
         }
         wasSinglePressed = isSinglePressed;
 
-        // Spread Shot - Rechte Maustaste
+        // Spread Shot - Rechte Maustaste  
         bool isSpreadPressed = shootSpreadAction.IsPressed();
         if (isSpreadPressed && !wasSpreadPressed)
         {
-            Debug.Log($"Client {Owner.ClientId}: Right Mouse PRESSED!");
-            ShootServerRpc(2); // Pattern 2 = Spread
+            ShootServerRpc(2);
         }
         wasSpreadPressed = isSpreadPressed;
     }
@@ -178,8 +194,6 @@ public class OwnPlayerController : NetworkBehaviour
     [ServerRpc]
     private void ShootServerRpc(int pattern)
     {
-        Debug.Log($"Server: Client {Owner.ClientId} shoots pattern {pattern}!");
-
         Vector3 spawnPos = firePoint ? firePoint.position : transform.position;
         Vector2 baseDirection = Vector2.up;
 
@@ -195,9 +209,9 @@ public class OwnPlayerController : NetworkBehaviour
             Vector3 centerOffset = new Vector3(0f, 0f, 0f);
             Vector3 rightOffset = new Vector3(0.4f, 0f, 0f);
 
-            SpawnBullet(spawnPos + leftOffset, Rotate(baseDirection, 30f));   // Links ↖
-            SpawnBullet(spawnPos + centerOffset, baseDirection);                // Mitte ↑
-            SpawnBullet(spawnPos + rightOffset, Rotate(baseDirection, -30f));   // Rechts ↗
+            SpawnBullet(spawnPos + leftOffset, Rotate(baseDirection, 30f));
+            SpawnBullet(spawnPos + centerOffset, baseDirection);
+            SpawnBullet(spawnPos + rightOffset, Rotate(baseDirection, -30f));
         }
     }
 
@@ -224,6 +238,78 @@ public class OwnPlayerController : NetworkBehaviour
         float cos = Mathf.Cos(radians);
         float sin = Mathf.Sin(radians);
         return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
+    }
+    #endregion
+
+    #region Health
+    [ServerRpc(RequireOwnership = false)]
+    public void TakeDamageServerRpc()
+    {
+        lives.Value--;
+        Debug.Log($"Player {Owner.ClientId} took damage! Lives: {lives.Value}");
+
+        if (lives.Value <= 0)
+        {
+            Die();
+        }
+    }
+
+    private void Die()
+    {
+        Debug.Log($"Player {Owner.ClientId} died! GAME OVER!");
+
+        // Deaktiviere Spieler (unsichtbar und inaktiv)
+        DisablePlayerObserversRpc();
+
+        // Benachrichtige GameManager
+        OwnNetworkGameManager gameManager = FindFirstObjectByType<OwnNetworkGameManager>();
+        if (gameManager != null)
+        {
+            gameManager.OnPlayerDied(Owner.ClientId);
+        }
+    }
+
+    [ObserversRpc]
+    private void DisablePlayerObserversRpc()
+    {
+        // Renderer ausschalten (unsichtbar)
+        if (playerRenderer != null)
+            playerRenderer.enabled = false;
+
+        // Collider ausschalten
+        Collider2D col = GetComponent<Collider2D>();
+        if (col != null)
+            col.enabled = false;
+
+        // Controls ausschalten
+        if (IsOwner)
+        {
+            moveAction?.Disable();
+            shootSingleAction?.Disable();
+            shootSpreadAction?.Disable();
+
+            if (TimeManager != null)
+                TimeManager.OnTick -= OnTick;
+        }
+
+        Debug.Log($"Player {Owner.ClientId} disabled!");
+    }
+
+    private void OnLivesChanged(int prev, int next, bool asServer)
+    {
+        UpdateLivesUI();
+    }
+
+    private void UpdateLivesUI()
+    {
+        if (!IsOwner) return;
+
+        // Finde das UI Element dynamisch
+        TMP_Text livesUI = GameObject.Find("LivesText")?.GetComponent<TMP_Text>();
+        if (livesUI != null)
+        {
+            livesUI.text = $"Lives: {lives.Value}";
+        }
     }
     #endregion
 

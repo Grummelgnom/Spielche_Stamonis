@@ -69,7 +69,11 @@ public class OwnNetworkGameManager : NetworkBehaviour
         scoreP1.Value = 0;
         scoreP2.Value = 0;
     }
-
+    public void OnPlayerDied(int clientId)
+    {
+        Debug.Log($"Player {clientId} has died! Game Over for this player!");
+        // Hier später: Check ob beide tot sind, dann komplett Game Over
+    }
     #region State-Handling
 
     [Server]

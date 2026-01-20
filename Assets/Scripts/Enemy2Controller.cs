@@ -13,6 +13,7 @@ public class Enemy2Controller : NetworkBehaviour
 
     private Rigidbody2D rb;
     private float zigzagTime = 0f;
+    private float lastPlayerDamageTime = 0f;
 
     private void Awake()
     {
@@ -38,6 +39,31 @@ public class Enemy2Controller : NetworkBehaviour
         rb.linearVelocity = velocity;
     }
 
+    private void Update()
+    {
+        if (!IsServerInitialized) return;
+
+        // Despawn wenn Enemy aus dem Bildschirm ist (zu weit unten)
+        if (transform.position.y < -6f)
+        {
+            Debug.Log($"Enemy2 left screen at y={transform.position.y}, despawning");
+            Die();
+        }
+    }
+
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (!IsServerInitialized) return;
+
+        OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
+        if (player != null && Time.time > lastPlayerDamageTime + 1f)
+        {
+            Debug.Log($"Enemy2 hit player {player.Owner.ClientId}!");
+            player.TakeDamageServerRpc();
+            lastPlayerDamageTime = Time.time;
+        }
+    }
+
     [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc(int damage)
     {
@@ -58,17 +84,4 @@ public class Enemy2Controller : NetworkBehaviour
             ServerManager.Despawn(gameObject);
         }
     }
-
-    private void Update()
-    {
-        if (!IsServerInitialized) return;
-
-        // Despawn wenn Enemy aus dem Bildschirm ist (zu weit unten)
-        if (transform.position.y < -6f)
-        {
-            Debug.Log($"Enemy2 left screen at y={transform.position.y}, despawning");
-            Die();
-        }
-    }
-
 }
