@@ -1,4 +1,5 @@
 ﻿using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 
 public class BulletController : NetworkBehaviour
@@ -7,16 +8,16 @@ public class BulletController : NetworkBehaviour
     [SerializeField] private float maxDistance = 20f;
 
     private Rigidbody2D rb;
-    private Vector3 shootDirection = Vector3.up;
+    private readonly SyncVar<Vector3> shootDirection = new SyncVar<Vector3>(Vector3.up);
     private Vector3 spawnPosition;
     private float distanceTraveled = 0f;
     private bool hasHit = false;
 
     public void InitializeBullet(Vector3 direction)
     {
-        shootDirection = direction.normalized;
+        shootDirection.Value = direction.normalized;
         spawnPosition = transform.position;
-        Debug.Log($"Bullet initialized at {spawnPosition} with direction: {shootDirection}");
+        Debug.Log($"Bullet initialized at {spawnPosition} with direction: {shootDirection.Value}");
     }
 
     private void Start()
@@ -24,12 +25,12 @@ public class BulletController : NetworkBehaviour
         rb = GetComponent<Rigidbody2D>();
 
         Debug.Log($"BulletController Start");
-        Debug.Log($"Direction: {shootDirection}");
+        Debug.Log($"Direction: {shootDirection.Value}");
         Debug.Log($"Speed: {bulletSpeed}");
         Debug.Log($"Max Distance: {maxDistance}");
 
-        // Setze Velocity - gerade nach oben!
-        rb.linearVelocity = shootDirection * bulletSpeed;
+        // Setze Velocity mit synchronisierter Direction!
+        rb.linearVelocity = shootDirection.Value * bulletSpeed;
 
         Debug.Log($"Velocity set to: {rb.linearVelocity}");
     }
@@ -55,8 +56,15 @@ public class BulletController : NetworkBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
+        // Nur Server handled Kollisionen
+        if (!IsServer) return;
+
         // Verhindere mehrfache Treffer
         if (hasHit) return;
+
+        // Ignoriere andere Bullets
+        if (collision.GetComponent<BulletController>() != null)
+            return;
 
         Debug.Log($"Bullet OnTriggerEnter2D: {collision.gameObject.name}");
 
@@ -67,11 +75,7 @@ public class BulletController : NetworkBehaviour
             Debug.Log("Bullet hit an ENEMY!");
             hasHit = true;
             enemy.TakeDamageServerRpc(10);
-
-            if (IsServer)
-            {
-                Destroy(gameObject);
-            }
+            Destroy(gameObject);
             return;
         }
 
@@ -85,9 +89,6 @@ public class BulletController : NetworkBehaviour
 
         // Sonst: Treffer an Wände etc
         Debug.Log($"Bullet hit something else: {collision.gameObject.name}");
-        if (IsServer)
-        {
-            Destroy(gameObject);
-        }
+        Destroy(gameObject);
     }
 }

@@ -410,26 +410,42 @@ MonoBehaviour:
       m_Action: Color Change
       m_Flags: 0
     m_Flags: 0
-  shootAction:
-    m_Name: Shoot
+  shootSingleAction:
+    m_Name: Shoot Single
     m_Type: 0
     m_ExpectedControlType: 
-    m_Id: 88bbba07-7270-404a-830c-8d724e4d1751
+    m_Id: 56a0c4e7-d14a-4a39-ad12-a69566b566e5
     m_Processors: 
     m_Interactions: 
     m_SingletonActionBindings:
     - m_Name: 
-      m_Id: 833534ee-a59d-4bb8-ba5d-e51c0de16f36
-      m_Path: <Keyboard>/space
+      m_Id: 578d48a6-f6cc-4dd2-8551-c1ca7c91faca
+      m_Path: <Mouse>/leftButton
       m_Interactions: 
       m_Processors: 
       m_Groups: 
-      m_Action: Shoot
+      m_Action: Shoot Single
+      m_Flags: 0
+    m_Flags: 0
+  shootSpreadAction:
+    m_Name: Shoot Spread
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: 2665b27c-deaa-47ee-93b4-7085dea435d5
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings:
+    - m_Name: 
+      m_Id: 2c3c52c4-6727-43ec-b830-03ecabb784b8
+      m_Path: <Mouse>/rightButton
+      m_Interactions: 
+      m_Processors: 
+      m_Groups: 
+      m_Action: Shoot Spread
       m_Flags: 0
     m_Flags: 0
   bulletPrefab: {fileID: 4134115370651068687, guid: af9c858e2694ee74f95bf4c5f4b7bfda, type: 3}
   firePoint: {fileID: 0}
-  shootCooldown: 0.3
   playerIndexText: {fileID: 636713386052345080}
 --- !u!114 &3354985067614939379
 MonoBehaviour:
@@ -462,7 +478,7 @@ MonoBehaviour:
   _initializeOrder: 0
   _preventDespawnOnDisconnect: 0
   _defaultDespawnType: 0
-  _initializedTimestamp: -8584332130102863143
+  _initializedTimestamp: -8584326863804637229
   NetworkObserver: {fileID: 0}
   _enablePrediction: 0
   _predictionType: 0

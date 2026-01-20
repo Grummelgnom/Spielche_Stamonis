@@ -1,4 +1,4 @@
-using FishNet.Object;
+ï»¿using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using System.Collections;
 using TMPro;
@@ -24,10 +24,12 @@ public class OwnPlayerController : NetworkBehaviour
     [SerializeField] private InputAction colorChangeAction;
 
     [Header("Shooting")]
-    [SerializeField] private InputAction shootAction;
+    [SerializeField] private InputAction shootSingleAction;  // Linke Maustaste
+    [SerializeField] private InputAction shootSpreadAction;  // Rechte Maustaste
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform firePoint;
-    private bool wasShootPressed = false;
+    private bool wasSinglePressed = false;
+    private bool wasSpreadPressed = false;
 
     [Header("Player UI")]
     [SerializeField] private TextMeshPro playerIndexText;
@@ -42,7 +44,8 @@ public class OwnPlayerController : NetworkBehaviour
 
         moveAction?.Disable();
         colorChangeAction?.Disable();
-        shootAction?.Disable();
+        shootSingleAction?.Disable();
+        shootSpreadAction?.Disable();
         if (TimeManager != null)
             TimeManager.OnTick -= OnTick;
     }
@@ -75,7 +78,8 @@ public class OwnPlayerController : NetworkBehaviour
 
             moveAction?.Enable();
             colorChangeAction?.Enable();
-            shootAction?.Enable();
+            shootSingleAction?.Enable();
+            shootSpreadAction?.Enable();
             Debug.Log("Owner enabled all actions!");
             if (TimeManager != null)
                 TimeManager.OnTick += OnTick;
@@ -152,45 +156,74 @@ public class OwnPlayerController : NetworkBehaviour
     #region Shooting
     private void HandleShooting()
     {
-        // Prüfe ob Space gerade gedrückt wurde (State-Wechsel)
-        bool isShootPressed = shootAction.IsPressed();
-
-        if (isShootPressed && !wasShootPressed)
+        // Single Shot - Linke Maustaste
+        bool isSinglePressed = shootSingleAction.IsPressed();
+        if (isSinglePressed && !wasSinglePressed)
         {
-            // Space wurde GERADE gedrückt!
-            Debug.Log($"Client {Owner.ClientId}: Space PRESSED!");
-            ShootServerRpc();
+            Debug.Log($"Client {Owner.ClientId}: Left Mouse PRESSED!");
+            ShootServerRpc(1); // Pattern 1 = Single
         }
+        wasSinglePressed = isSinglePressed;
 
-        // Speichere State für nächsten Tick
-        wasShootPressed = isShootPressed;
+        // Spread Shot - Rechte Maustaste
+        bool isSpreadPressed = shootSpreadAction.IsPressed();
+        if (isSpreadPressed && !wasSpreadPressed)
+        {
+            Debug.Log($"Client {Owner.ClientId}: Right Mouse PRESSED!");
+            ShootServerRpc(2); // Pattern 2 = Spread
+        }
+        wasSpreadPressed = isSpreadPressed;
     }
 
     [ServerRpc]
-    private void ShootServerRpc()
+    private void ShootServerRpc(int pattern)
     {
-        Debug.Log($"Server: Client {Owner.ClientId} shoots!");
+        Debug.Log($"Server: Client {Owner.ClientId} shoots pattern {pattern}!");
 
         Vector3 spawnPos = firePoint ? firePoint.position : transform.position;
-        Quaternion spawnRot = firePoint ? firePoint.rotation : Quaternion.identity;
+        Vector2 baseDirection = Vector2.up;
 
-        // Erstelle Bullet
-        GameObject bulletObj = Instantiate(bulletPrefab, spawnPos, spawnRot);
+        if (pattern == 1)
+        {
+            // Single Shot
+            SpawnBullet(spawnPos, baseDirection);
+        }
+        else if (pattern == 2)
+        {
+            // Triple Shot - 3 Bullets im FÃ¤cher
+            Vector3 leftOffset = new Vector3(-0.4f, 0f, 0f);
+            Vector3 centerOffset = new Vector3(0f, 0f, 0f);
+            Vector3 rightOffset = new Vector3(0.4f, 0f, 0f);
 
-        // Initialisiere Bullet
+            SpawnBullet(spawnPos + leftOffset, Rotate(baseDirection, 30f));   // Links â†–
+            SpawnBullet(spawnPos + centerOffset, baseDirection);                // Mitte â†‘
+            SpawnBullet(spawnPos + rightOffset, Rotate(baseDirection, -30f));   // Rechts â†—
+        }
+    }
+
+    private void SpawnBullet(Vector3 position, Vector2 direction)
+    {
+        GameObject bulletObj = Instantiate(bulletPrefab, position, Quaternion.identity);
+
         BulletController bulletCtrl = bulletObj.GetComponent<BulletController>();
         if (bulletCtrl != null)
         {
-            bulletCtrl.InitializeBullet(transform.up);
+            bulletCtrl.InitializeBullet(direction);
         }
 
-        // Spawne als NetworkObject
         NetworkObject netObj = bulletObj.GetComponent<NetworkObject>();
         if (netObj != null)
         {
             ServerManager.Spawn(bulletObj, Owner);
-            Debug.Log("Bullet spawned!");
         }
+    }
+
+    private Vector2 Rotate(Vector2 v, float degrees)
+    {
+        float radians = degrees * Mathf.Deg2Rad;
+        float cos = Mathf.Cos(radians);
+        float sin = Mathf.Sin(radians);
+        return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
     }
     #endregion
 
