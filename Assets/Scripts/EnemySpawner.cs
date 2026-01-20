@@ -9,7 +9,11 @@ public class EnemySpawner : NetworkBehaviour
 {
     public static EnemySpawner Instance { get; private set; }
 
-    [SerializeField] private GameObject enemyPrefab;
+    [Header("Enemy Prefabs")]
+    [SerializeField] private GameObject enemy1Prefab;  // Roter Enemy (folgt Spieler)
+    [SerializeField] private GameObject enemy2Prefab;  // Gelber Enemy (Zickzack)
+
+    [Header("Spawn Settings")]
     [SerializeField] private int enemiesToSpawn = 3;
     [SerializeField] private float spawnDelay = 2f;
     [SerializeField] private Vector2 spawnAreaMin = new Vector2(-8, 5);
@@ -25,11 +29,9 @@ public class EnemySpawner : NetworkBehaviour
 
     private void Start()
     {
-        // NICHT mehr automatisch spawnen!
         Debug.Log("EnemySpawner ready - waiting for game to start...");
     }
 
-    // Diese Methode wird vom GameManager aufgerufen wenn Spiel startet
     public void StartWave()
     {
         if (!IsServer)
@@ -61,8 +63,17 @@ public class EnemySpawner : NetworkBehaviour
         float randomY = UnityEngine.Random.Range(spawnAreaMin.y, spawnAreaMax.y);
         Vector3 spawnPos = new Vector3(randomX, randomY, 0);
 
+        // 50/50 Chance für Enemy1 oder Enemy2
+        GameObject prefabToSpawn = UnityEngine.Random.value < 0.5f ? enemy1Prefab : enemy2Prefab;
+
+        if (prefabToSpawn == null)
+        {
+            Debug.LogError("Enemy prefab is null!");
+            return;
+        }
+
         // Spawn Enemy
-        GameObject enemyObj = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
+        GameObject enemyObj = Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
 
         Debug.Log($"Enemy spawned at {spawnPos}");
 
