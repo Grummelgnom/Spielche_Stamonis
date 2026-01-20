@@ -32,6 +32,11 @@ public class FishNetSceneLoader : NetworkBehaviour
     {
         RequestLoadSceneRpc();  // Sendet RPC zum Server
     }
+
+    void Update()
+    {
+        Debug.Log("Update läuft");
+    }
 }
 
 internal class LoadSceneOptions : LoadOptions
