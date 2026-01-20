@@ -4,12 +4,13 @@ using UnityEngine;
 public class BulletController : NetworkBehaviour
 {
     [SerializeField] private float bulletSpeed = 20f;
-    [SerializeField] private float maxDistance = 20f;  // ← EINSTELLBAR!
+    [SerializeField] private float maxDistance = 20f;
 
     private Rigidbody2D rb;
     private Vector3 shootDirection = Vector3.up;
     private Vector3 spawnPosition;
     private float distanceTraveled = 0f;
+    private bool hasHit = false;
 
     public void InitializeBullet(Vector3 direction)
     {
@@ -54,7 +55,36 @@ public class BulletController : NetworkBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        Debug.Log($"Bullet hit: {collision.gameObject.name}");
+        // Verhindere mehrfache Treffer
+        if (hasHit) return;
+
+        Debug.Log($"Bullet OnTriggerEnter2D: {collision.gameObject.name}");
+
+        // Prüfe ob es ein Enemy ist
+        EnemyController enemy = collision.GetComponent<EnemyController>();
+        if (enemy != null)
+        {
+            Debug.Log("Bullet hit an ENEMY!");
+            hasHit = true;
+            enemy.TakeDamageServerRpc(10);
+
+            if (IsServer)
+            {
+                Destroy(gameObject);
+            }
+            return;
+        }
+
+        // Prüfe ob es ein Player ist (freundlicher Feuer vermeiden)
+        OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
+        if (player != null)
+        {
+            Debug.Log("Bullet hit a PLAYER (friendly fire prevented)");
+            return;
+        }
+
+        // Sonst: Treffer an Wände etc
+        Debug.Log($"Bullet hit something else: {collision.gameObject.name}");
         if (IsServer)
         {
             Destroy(gameObject);
