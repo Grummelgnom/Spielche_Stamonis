@@ -1,9 +1,11 @@
 using FishNet.Managing;
 using FishNet.Managing.Server;
 using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using System;
 using System.Collections;
 using UnityEngine;
+using TMPro;
 
 public class EnemySpawner : NetworkBehaviour
 {
@@ -19,6 +21,10 @@ public class EnemySpawner : NetworkBehaviour
     [SerializeField] private Vector2 spawnAreaMin = new Vector2(-8, 5);
     [SerializeField] private Vector2 spawnAreaMax = new Vector2(8, 8);
 
+    [Header("UI")]
+    [SerializeField] private TextMeshProUGUI waveCountdownText;
+
+    private readonly SyncVar<int> countdownSeconds = new SyncVar<int>(0);
     private int currentWave = 0;
 
     private void Awake()
@@ -32,6 +38,23 @@ public class EnemySpawner : NetworkBehaviour
         Debug.Log("EnemySpawner ready - waiting for game to start...");
     }
 
+    public override void OnStartNetwork()
+    {
+        base.OnStartNetwork();
+        countdownSeconds.OnChange += OnCountdownChanged;
+    }
+
+    public override void OnStopNetwork()
+    {
+        base.OnStopNetwork();
+        countdownSeconds.OnChange -= OnCountdownChanged;
+    }
+
+    private void OnCountdownChanged(int prev, int next, bool asServer)
+    {
+        UpdateCountdownText();
+    }
+
     public void StartWave()
     {
         if (!IsServer)
@@ -41,8 +64,12 @@ public class EnemySpawner : NetworkBehaviour
         }
 
         currentWave++;
-        Debug.Log($"Starting Wave {currentWave}!");
-        StartCoroutine(SpawnEnemiesForWave(enemiesToSpawn));
+
+        // Jede Wave spawnt 2 mehr Enemies!
+        int enemiesThisWave = 3 + (currentWave - 1) * 2;
+
+        Debug.Log($"Starting Wave {currentWave}! Enemies: {enemiesThisWave}");
+        StartCoroutine(SpawnEnemiesForWave(enemiesThisWave));
     }
 
     private IEnumerator SpawnEnemiesForWave(int count)
@@ -54,6 +81,16 @@ public class EnemySpawner : NetworkBehaviour
         }
 
         Debug.Log($"Wave {currentWave} complete!");
+
+        // Countdown für nächste Wave
+        for (int i = 10; i >= 1; i--)
+        {
+            countdownSeconds.Value = i;
+            yield return new WaitForSeconds(1f);
+        }
+
+        countdownSeconds.Value = 0;
+        StartWave();
     }
 
     private void SpawnEnemy()
@@ -83,5 +120,15 @@ public class EnemySpawner : NetworkBehaviour
         {
             ServerManager.Spawn(enemyObj);
         }
+    }
+
+    private void UpdateCountdownText()
+    {
+        if (waveCountdownText == null) return;
+
+        if (countdownSeconds.Value > 0)
+            waveCountdownText.text = $"NÄCHSTE WELLE IN: {countdownSeconds.Value}";
+        else
+            waveCountdownText.text = "";
     }
 }

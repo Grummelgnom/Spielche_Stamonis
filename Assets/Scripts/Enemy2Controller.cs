@@ -58,4 +58,17 @@ public class Enemy2Controller : NetworkBehaviour
             ServerManager.Despawn(gameObject);
         }
     }
+
+    private void Update()
+    {
+        if (!IsServerInitialized) return;
+
+        // Despawn wenn Enemy aus dem Bildschirm ist (zu weit unten)
+        if (transform.position.y < -6f)
+        {
+            Debug.Log($"Enemy2 left screen at y={transform.position.y}, despawning");
+            Die();
+        }
+    }
+
 }

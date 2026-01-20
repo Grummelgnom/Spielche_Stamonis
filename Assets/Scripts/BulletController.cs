@@ -56,10 +56,8 @@ public class BulletController : NetworkBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        // Nur Server handled Kollisionen
         if (!IsServer) return;
 
-        // Verhindere mehrfache Treffer
         if (hasHit) return;
 
         // Ignoriere andere Bullets
@@ -68,13 +66,24 @@ public class BulletController : NetworkBehaviour
 
         Debug.Log($"Bullet OnTriggerEnter2D: {collision.gameObject.name}");
 
-        // Prüfe ob es ein Enemy ist
-        EnemyController enemy = collision.GetComponent<EnemyController>();
-        if (enemy != null)
+        // Prüfe Enemy Type 1
+        EnemyController enemy1 = collision.GetComponent<EnemyController>();
+        if (enemy1 != null)
         {
-            Debug.Log("Bullet hit an ENEMY!");
+            Debug.Log("Bullet hit an ENEMY1!");
             hasHit = true;
-            enemy.TakeDamageServerRpc(10);
+            enemy1.TakeDamageServerRpc(10);
+            Destroy(gameObject);
+            return;
+        }
+
+        // Prüfe Enemy Type 2
+        Enemy2Controller enemy2 = collision.GetComponent<Enemy2Controller>();
+        if (enemy2 != null)
+        {
+            Debug.Log("Bullet hit an ENEMY2!");
+            hasHit = true;
+            enemy2.TakeDamageServerRpc(10);
             Destroy(gameObject);
             return;
         }
@@ -91,4 +100,5 @@ public class BulletController : NetworkBehaviour
         Debug.Log($"Bullet hit something else: {collision.gameObject.name}");
         Destroy(gameObject);
     }
+
 }
