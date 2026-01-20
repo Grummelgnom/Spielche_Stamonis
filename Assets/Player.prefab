@@ -340,7 +340,7 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: 3354985067614939379}
   _networkObjectCache: {fileID: 3354985067614939379}
-  moveSpeed: 5
+  moveSpeed: 10
   minY: -4
   maxY: 4
   minX: -4

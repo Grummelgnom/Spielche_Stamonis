@@ -51,6 +51,10 @@ public class EnemyController : NetworkBehaviour
             Vector2 direction = (targetPlayer.position - transform.position).normalized;
             rb.linearVelocity = direction * moveSpeed;
         }
+        else
+        {
+            rb.linearVelocity = Vector2.zero;
+        }
     }
 
     private void FindClosestPlayer()
@@ -59,18 +63,17 @@ public class EnemyController : NetworkBehaviour
 
         if (players.Length == 0)
         {
-            Debug.LogWarning("No players found!");
             return;
         }
-
-        Debug.Log($"Found {players.Length} players");
 
         float closestDistance = Mathf.Infinity;
         Transform closest = null;
 
         foreach (OwnPlayerController player in players)
         {
-            if (player == null || !player.gameObject.activeInHierarchy) continue;
+            // Ignoriere tote, inaktive oder nicht existierende Player
+            if (player == null || !player.gameObject.activeInHierarchy || player.isDead.Value)
+                continue;
 
             float distance = Vector2.Distance(transform.position, player.transform.position);
             if (distance < closestDistance)
@@ -81,10 +84,6 @@ public class EnemyController : NetworkBehaviour
         }
 
         targetPlayer = closest;
-        if (targetPlayer != null)
-        {
-            Debug.Log($"Found closest player: {targetPlayer.gameObject.name}");
-        }
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
@@ -92,13 +91,14 @@ public class EnemyController : NetworkBehaviour
         if (!IsServerInitialized) return;
 
         OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
-        if (player != null && Time.time > lastPlayerDamageTime + 1f)
+        if (player != null && !player.isDead.Value)
         {
-            Debug.Log($"Enemy1 hit player {player.Owner.ClientId}!");
+            Debug.Log($"Enemy1 hit player {player.Owner.ClientId}! Enemy destroyed!");
             player.TakeDamageServerRpc();
-            lastPlayerDamageTime = Time.time;
+            Die();  // Enemy stirbt beim Treffen
         }
     }
+
 
     [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc(int damage)

@@ -13,6 +13,7 @@ public class OwnPlayerController : NetworkBehaviour
 
     [Header("Health")]
     public readonly SyncVar<int> lives = new SyncVar<int>(3);
+    public readonly SyncVar<bool> isDead = new SyncVar<bool>(false);
 
     private Renderer playerRenderer;
 
@@ -27,8 +28,8 @@ public class OwnPlayerController : NetworkBehaviour
     [SerializeField] private InputAction colorChangeAction;
 
     [Header("Shooting")]
-    [SerializeField] private InputAction shootSingleAction;  // Linke Maustaste
-    [SerializeField] private InputAction shootSpreadAction;  // Rechte Maustaste
+    [SerializeField] private InputAction shootSingleAction;
+    [SerializeField] private InputAction shootSpreadAction;
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform firePoint;
     private bool wasSinglePressed = false;
@@ -258,7 +259,9 @@ public class OwnPlayerController : NetworkBehaviour
     {
         Debug.Log($"Player {Owner.ClientId} died! GAME OVER!");
 
-        // Deaktiviere Spieler (unsichtbar und inaktiv)
+        isDead.Value = true;
+
+        // Deaktiviere Spieler komplett
         DisablePlayerObserversRpc();
 
         // Benachrichtige GameManager
@@ -272,27 +275,10 @@ public class OwnPlayerController : NetworkBehaviour
     [ObserversRpc]
     private void DisablePlayerObserversRpc()
     {
-        // Renderer ausschalten (unsichtbar)
-        if (playerRenderer != null)
-            playerRenderer.enabled = false;
+        // Komplettes GameObject deaktivieren
+        gameObject.SetActive(false);
 
-        // Collider ausschalten
-        Collider2D col = GetComponent<Collider2D>();
-        if (col != null)
-            col.enabled = false;
-
-        // Controls ausschalten
-        if (IsOwner)
-        {
-            moveAction?.Disable();
-            shootSingleAction?.Disable();
-            shootSpreadAction?.Disable();
-
-            if (TimeManager != null)
-                TimeManager.OnTick -= OnTick;
-        }
-
-        Debug.Log($"Player {Owner.ClientId} disabled!");
+        Debug.Log($"Player {Owner.ClientId} completely disabled!");
     }
 
     private void OnLivesChanged(int prev, int next, bool asServer)
@@ -308,9 +294,19 @@ public class OwnPlayerController : NetworkBehaviour
         TMP_Text livesUI = GameObject.Find("LivesText")?.GetComponent<TMP_Text>();
         if (livesUI != null)
         {
-            livesUI.text = $"Lives: {lives.Value}";
+            if (lives.Value <= 0)
+            {
+                livesUI.text = "GAME OVER";
+                livesUI.color = Color.red;
+            }
+            else
+            {
+                livesUI.text = $"Lives: {lives.Value}";
+                livesUI.color = Color.white;
+            }
         }
     }
+
     #endregion
 
     #region ColorChange

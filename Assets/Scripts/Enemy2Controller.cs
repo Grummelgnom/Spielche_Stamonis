@@ -56,13 +56,14 @@ public class Enemy2Controller : NetworkBehaviour
         if (!IsServerInitialized) return;
 
         OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
-        if (player != null && Time.time > lastPlayerDamageTime + 1f)
+        if (player != null && !player.isDead.Value)
         {
-            Debug.Log($"Enemy2 hit player {player.Owner.ClientId}!");
+            Debug.Log($"Enemy2 hit player {player.Owner.ClientId}! Enemy destroyed!");
             player.TakeDamageServerRpc();
-            lastPlayerDamageTime = Time.time;
+            Die();  // Enemy stirbt beim Treffen
         }
     }
+
 
     [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc(int damage)
