@@ -69,7 +69,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
         scoreP1.Value = 0;
         scoreP2.Value = 0;
     }
-    
+
     #region State-Handling
 
     [Server]
@@ -80,10 +80,23 @@ public class OwnNetworkGameManager : NetworkBehaviour
         var players = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None);
         if (players.Length >= 2 && players.All(p => p.IsReady))
         {
-            gameState.Value = GameState.Playing; // Playing wird hier gesetzt
-            StartCoroutine(OwnBallSpawner.Instance.SpawnBall(5f));
+            gameState.Value = GameState.Playing;
+            Debug.Log("Game started! Spawning enemies...");
+
+            // Sichere Version: Prüfe ob EnemySpawner existiert
+            if (EnemySpawner.Instance != null)
+            {
+                EnemySpawner.Instance.StartWave();
+                Debug.Log("EnemySpawner.StartWave() called!");
+            }
+            else
+            {
+                Debug.LogError("EnemySpawner.Instance is NULL! Make sure it's in the scene!");
+            }
         }
     }
+
+
 
     public void SetPlayerReady()
     {
