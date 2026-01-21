@@ -180,7 +180,8 @@ MonoBehaviour:
   _addedNetworkObject: {fileID: 6665046743235456008}
   _networkObjectCache: {fileID: 6665046743235456008}
   moveSpeed: 2
-  maxHealth: 20
+  enemyBulletPrefab: {fileID: 4134115370651068687, guid: b8c012d9c97f4b24eaa01f8e63ecb09d, type: 3}
+  shootInterval: 3
 --- !u!114 &6665046743235456008
 MonoBehaviour:
   m_ObjectHideFlags: 0

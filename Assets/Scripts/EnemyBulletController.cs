@@ -1,53 +1,66 @@
 using FishNet.Object;
+using FishNet.Object.Synchronizing;
 using UnityEngine;
 
 public class EnemyBulletController : NetworkBehaviour
 {
-    public float speed = 15f;
-    public float maxDistance = 20f;
-    public int damage = 10;
+    [SerializeField] private float bulletSpeed = 10f;
+    [SerializeField] private float maxDistance = 20f;
 
-    private Vector3 direction;
-    private Vector3 startPosition;
     private Rigidbody2D rb;
+    private readonly SyncVar<Vector3> shootDirection = new SyncVar<Vector3>(Vector3.down);
+    private Vector3 spawnPosition;
+    private bool hasHit = false;
 
-    public void InitializeBullet(Vector3 shootDirection)
+    public void InitializeBullet(Vector3 direction)
     {
-        direction = shootDirection.normalized;
-        startPosition = transform.position;
+        shootDirection.Value = direction.normalized;
+        spawnPosition = transform.position;
     }
 
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
-
-        if (rb != null)
-        {
-            rb.linearVelocity = new Vector2(direction.x, direction.y) * speed;
-        }
+        rb.linearVelocity = shootDirection.Value * bulletSpeed;
     }
 
     private void Update()
     {
-        if (!IsServerInitialized) return;
-
-        float distanceTraveled = Vector3.Distance(startPosition, transform.position);
-        if (distanceTraveled >= maxDistance)
+        if (spawnPosition != Vector3.zero)
         {
-            ServerManager.Despawn(gameObject);
+            float distanceTraveled = Vector3.Distance(transform.position, spawnPosition);
+
+            if (distanceTraveled > maxDistance)
+            {
+                if (IsServer)
+                {
+                    Destroy(gameObject);
+                }
+            }
         }
     }
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (!IsServerInitialized) return;
+        if (!IsServer) return;
+        if (hasHit) return;
 
+        // Ignoriere andere Bullets (wichtig!)
+        if (collision.GetComponent<BulletController>() != null ||
+            collision.GetComponent<EnemyBulletController>() != null)
+            return;
+
+        // Nur Player treffen
         OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
-        if (player != null)
+        if (player != null && !player.isDead.Value)
         {
-            // Später: player.TakeDamage(damage);
-            Debug.Log($"Enemy bullet hit Player {player.Owner.ClientId}!");
-            ServerManager.Despawn(gameObject);
+            Debug.Log($"EnemyBullet hit player {player.Owner.ClientId}!");
+            hasHit = true;
+            player.TakeDamageServerRpc();
+            Destroy(gameObject);
+            return;
         }
+
+        // Alles andere ignorieren (keine Wände etc)
     }
 }

@@ -11,6 +11,11 @@ public class Enemy2Controller : NetworkBehaviour
     public float zigzagSpeed = 3f;
     public float zigzagWidth = 2f;
 
+    [Header("Shooting Settings")]
+    [SerializeField] private GameObject enemyBulletPrefab;
+    [SerializeField] private float shootInterval = 3f;
+    private float nextShootTime = 0f;
+
     private Rigidbody2D rb;
     private float zigzagTime = 0f;
     private float lastPlayerDamageTime = 0f;
@@ -37,13 +42,34 @@ public class Enemy2Controller : NetworkBehaviour
         Vector2 velocity = new Vector2(horizontalMovement, -moveDownSpeed);
 
         rb.linearVelocity = velocity;
+
+        // Schießen
+        if (Time.time >= nextShootTime && enemyBulletPrefab != null)
+        {
+            ShootDown();
+            nextShootTime = Time.time + shootInterval;
+        }
+    }
+
+    private void ShootDown()
+    {
+        GameObject bullet = Instantiate(enemyBulletPrefab, transform.position, Quaternion.identity);
+        ServerManager.Spawn(bullet);
+
+        EnemyBulletController bulletCtrl = bullet.GetComponent<EnemyBulletController>();
+        if (bulletCtrl != null)
+        {
+            bulletCtrl.InitializeBullet(Vector3.down);
+        }
+
+        Debug.Log("Enemy2 shot a bullet down!");
     }
 
     private void Update()
     {
         if (!IsServerInitialized) return;
 
-        // Despawn wenn Enemy aus dem Bildschirm ist (zu weit unten)
+        // Despawn wenn Enemy aus dem Bildschirm ist
         if (transform.position.y < -6f)
         {
             Debug.Log($"Enemy2 left screen at y={transform.position.y}, despawning");

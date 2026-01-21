@@ -281,3 +281,5 @@ MonoBehaviour:
   moveDownSpeed: 2
   zigzagSpeed: 3
   zigzagWidth: 2
+  enemyBulletPrefab: {fileID: 4134115370651068687, guid: b8c012d9c97f4b24eaa01f8e63ecb09d, type: 3}
+  shootInterval: 3

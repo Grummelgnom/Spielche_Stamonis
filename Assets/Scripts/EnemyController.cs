@@ -11,6 +11,11 @@ public class EnemyController : NetworkBehaviour
     private Rigidbody2D rb;
     private float lastPlayerDamageTime = 0f;
 
+    [Header("Shooting Settings")]
+    [SerializeField] private GameObject enemyBulletPrefab;
+    [SerializeField] private float shootInterval = 3f;
+    private float nextShootTime = 0f;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -55,6 +60,40 @@ public class EnemyController : NetworkBehaviour
         {
             rb.linearVelocity = Vector2.zero;
         }
+
+        // Schießen - 8 Bullets im Kreis
+        if (Time.time >= nextShootTime && enemyBulletPrefab != null)
+        {
+            Shoot360();
+            nextShootTime = Time.time + shootInterval;
+        }
+    }
+
+    private void Shoot360()
+    {
+        // 8 Bullets in alle Richtungen (alle 45°)
+        for (int i = 0; i < 8; i++)
+        {
+            float angle = i * 45f;
+            Vector2 direction = AngleToDirection(angle);
+
+            GameObject bullet = Instantiate(enemyBulletPrefab, transform.position, Quaternion.identity);
+            ServerManager.Spawn(bullet);
+
+            EnemyBulletController bulletCtrl = bullet.GetComponent<EnemyBulletController>();
+            if (bulletCtrl != null)
+            {
+                bulletCtrl.InitializeBullet(direction);
+            }
+        }
+
+        Debug.Log("Enemy1 shot 8 bullets in 360°!");
+    }
+
+    private Vector2 AngleToDirection(float angleDegrees)
+    {
+        float angleRadians = angleDegrees * Mathf.Deg2Rad;
+        return new Vector2(Mathf.Cos(angleRadians), Mathf.Sin(angleRadians));
     }
 
     private void FindClosestPlayer()
@@ -71,7 +110,6 @@ public class EnemyController : NetworkBehaviour
 
         foreach (OwnPlayerController player in players)
         {
-            // Ignoriere tote, inaktive oder nicht existierende Player
             if (player == null || !player.gameObject.activeInHierarchy || player.isDead.Value)
                 continue;
 
@@ -117,7 +155,6 @@ public class EnemyController : NetworkBehaviour
     {
         Debug.Log($"Enemy1 died! Killer: {killerClientId}");
 
-        // Gib Punkte an den Killer
         if (killerClientId >= 0)
         {
             OwnPlayerController[] players = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None);
