@@ -47,7 +47,7 @@ public class Enemy2Controller : NetworkBehaviour
         if (transform.position.y < -6f)
         {
             Debug.Log($"Enemy2 left screen at y={transform.position.y}, despawning");
-            Die();
+            Die(-1);
         }
     }
 
@@ -60,26 +60,43 @@ public class Enemy2Controller : NetworkBehaviour
         {
             Debug.Log($"Enemy2 hit player {player.Owner.ClientId}! Enemy destroyed!");
             player.TakeDamageServerRpc();
-            Die();  // Enemy stirbt beim Treffen
+            Die(-1);
         }
     }
 
-
     [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(int damage)
+    public void TakeDamageServerRpc(int damage, int shooterClientId)
     {
         if (!IsServerInitialized) return;
 
         health.Value -= damage;
+        Debug.Log($"Enemy2 took {damage} damage from player {shooterClientId}. Health: {health.Value}");
 
         if (health.Value <= 0)
         {
-            Die();
+            Die(shooterClientId);
         }
     }
 
-    private void Die()
+    private void Die(int killerClientId)
     {
+        Debug.Log($"Enemy2 died! Killer: {killerClientId}");
+
+        // Gib Punkte an den Killer
+        if (killerClientId >= 0)
+        {
+            OwnPlayerController[] players = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None);
+            foreach (var player in players)
+            {
+                if (player.Owner.ClientId == killerClientId)
+                {
+                    player.AddScore(10);
+                    Debug.Log($"Gave 10 points to player {killerClientId}");
+                    break;
+                }
+            }
+        }
+
         if (IsServerInitialized)
         {
             ServerManager.Despawn(gameObject);

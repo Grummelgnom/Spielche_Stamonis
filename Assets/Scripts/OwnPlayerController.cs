@@ -14,6 +14,7 @@ public class OwnPlayerController : NetworkBehaviour
     [Header("Health")]
     public readonly SyncVar<int> lives = new SyncVar<int>(3);
     public readonly SyncVar<bool> isDead = new SyncVar<bool>(false);
+    public readonly SyncVar<int> score = new SyncVar<int>(0);
 
     private Renderer playerRenderer;
 
@@ -45,13 +46,16 @@ public class OwnPlayerController : NetworkBehaviour
     {
         base.OnStartNetwork();
         lives.OnChange += OnLivesChanged;
+        score.OnChange += OnScoreChanged;
         UpdateLivesUI();
+        UpdateScoreUI();
     }
 
     public override void OnStopNetwork()
     {
         base.OnStopNetwork();
         lives.OnChange -= OnLivesChanged;
+        score.OnChange -= OnScoreChanged;
     }
 
     private void OnDisable()
@@ -102,6 +106,7 @@ public class OwnPlayerController : NetworkBehaviour
                 TimeManager.OnTick += OnTick;
 
             UpdateLivesUI();
+            UpdateScoreUI();
         }
     }
     #endregion
@@ -224,6 +229,7 @@ public class OwnPlayerController : NetworkBehaviour
         if (bulletCtrl != null)
         {
             bulletCtrl.InitializeBullet(direction);
+            bulletCtrl.shooterClientId = Owner.ClientId;
         }
 
         NetworkObject netObj = bulletObj.GetComponent<NetworkObject>();
@@ -261,10 +267,8 @@ public class OwnPlayerController : NetworkBehaviour
 
         isDead.Value = true;
 
-        // Deaktiviere Spieler komplett
         DisablePlayerObserversRpc();
 
-        // Benachrichtige GameManager
         OwnNetworkGameManager gameManager = FindFirstObjectByType<OwnNetworkGameManager>();
         if (gameManager != null)
         {
@@ -275,9 +279,7 @@ public class OwnPlayerController : NetworkBehaviour
     [ObserversRpc]
     private void DisablePlayerObserversRpc()
     {
-        // Komplettes GameObject deaktivieren
         gameObject.SetActive(false);
-
         Debug.Log($"Player {Owner.ClientId} completely disabled!");
     }
 
@@ -290,7 +292,6 @@ public class OwnPlayerController : NetworkBehaviour
     {
         if (!IsOwner) return;
 
-        // Finde das UI Element dynamisch
         TMP_Text livesUI = GameObject.Find("LivesText")?.GetComponent<TMP_Text>();
         if (livesUI != null)
         {
@@ -307,6 +308,28 @@ public class OwnPlayerController : NetworkBehaviour
         }
     }
 
+    public void AddScore(int points)
+    {
+        if (!IsServerInitialized) return;
+        score.Value += points;
+        Debug.Log($"Player {Owner.ClientId} score: {score.Value}");
+    }
+
+    private void OnScoreChanged(int prev, int next, bool asServer)
+    {
+        UpdateScoreUI();
+    }
+
+    private void UpdateScoreUI()
+    {
+        if (!IsOwner) return;
+
+        TMP_Text scoreUI = GameObject.Find("ScoreText")?.GetComponent<TMP_Text>();
+        if (scoreUI != null)
+        {
+            scoreUI.text = $"Score: {score.Value}";
+        }
+    }
     #endregion
 
     #region ColorChange

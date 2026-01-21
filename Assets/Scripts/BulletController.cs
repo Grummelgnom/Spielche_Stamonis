@@ -7,6 +7,8 @@ public class BulletController : NetworkBehaviour
     [SerializeField] private float bulletSpeed = 20f;
     [SerializeField] private float maxDistance = 20f;
 
+    public int shooterClientId = -1;
+
     private Rigidbody2D rb;
     private readonly SyncVar<Vector3> shootDirection = new SyncVar<Vector3>(Vector3.up);
     private Vector3 spawnPosition;
@@ -29,7 +31,6 @@ public class BulletController : NetworkBehaviour
         Debug.Log($"Speed: {bulletSpeed}");
         Debug.Log($"Max Distance: {maxDistance}");
 
-        // Setze Velocity mit synchronisierter Direction!
         rb.linearVelocity = shootDirection.Value * bulletSpeed;
 
         Debug.Log($"Velocity set to: {rb.linearVelocity}");
@@ -37,15 +38,12 @@ public class BulletController : NetworkBehaviour
 
     private void Update()
     {
-        // Tracke wie weit der Bullet geflogen ist
         if (spawnPosition != Vector3.zero)
         {
             distanceTraveled = Vector3.Distance(transform.position, spawnPosition);
 
-            // Wenn Bullet zu weit weg → Despawn
             if (distanceTraveled > maxDistance)
             {
-                Debug.Log($"Bullet despawned! Distance: {distanceTraveled} > Max: {maxDistance}");
                 if (IsServer)
                 {
                     Destroy(gameObject);
@@ -64,15 +62,13 @@ public class BulletController : NetworkBehaviour
         if (collision.GetComponent<BulletController>() != null)
             return;
 
-        Debug.Log($"Bullet OnTriggerEnter2D: {collision.gameObject.name}");
-
         // Prüfe Enemy Type 1
         EnemyController enemy1 = collision.GetComponent<EnemyController>();
         if (enemy1 != null)
         {
-            Debug.Log("Bullet hit an ENEMY1!");
+            Debug.Log($"Bullet hit ENEMY1! Shooter: {shooterClientId}");
             hasHit = true;
-            enemy1.TakeDamageServerRpc(10);
+            enemy1.TakeDamageServerRpc(10, shooterClientId);
             Destroy(gameObject);
             return;
         }
@@ -81,14 +77,14 @@ public class BulletController : NetworkBehaviour
         Enemy2Controller enemy2 = collision.GetComponent<Enemy2Controller>();
         if (enemy2 != null)
         {
-            Debug.Log("Bullet hit an ENEMY2!");
+            Debug.Log($"Bullet hit ENEMY2! Shooter: {shooterClientId}");
             hasHit = true;
-            enemy2.TakeDamageServerRpc(10);
+            enemy2.TakeDamageServerRpc(10, shooterClientId);
             Destroy(gameObject);
             return;
         }
 
-        // Prüfe ob es ein Player ist (freundlicher Feuer vermeiden)
+        // Prüfe ob es ein Player ist
         OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
         if (player != null)
         {
@@ -96,9 +92,7 @@ public class BulletController : NetworkBehaviour
             return;
         }
 
-        // Sonst: Treffer an Wände etc
         Debug.Log($"Bullet hit something else: {collision.gameObject.name}");
         Destroy(gameObject);
     }
-
 }
