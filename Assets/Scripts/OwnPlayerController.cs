@@ -254,16 +254,18 @@ public class OwnPlayerController : NetworkBehaviour
     #endregion
 
     #region Shield
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = false)]
     public void ActivateShieldServerRpc(float duration)
     {
         if (isDead.Value) return;
 
+        Debug.Log($"SERVER: Activating shield for player {Owner.ClientId}, duration {duration}");
+
         hasShield.Value = true;
-        Debug.Log($"Player {Owner.ClientId} activated shield for {duration} seconds!");
 
         Invoke(nameof(DeactivateShield), duration);
     }
+
 
     private void DeactivateShield()
     {
@@ -278,7 +280,7 @@ public class OwnPlayerController : NetworkBehaviour
 
     private void CreateShieldVisual()
     {
-        // Erstelle grünen Ring um Player
+        // Erstelle grünen Ring um Player (einfacher!)
         shieldVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         shieldVisual.name = "ShieldVisual";
         shieldVisual.transform.SetParent(transform);
@@ -286,23 +288,16 @@ public class OwnPlayerController : NetworkBehaviour
         shieldVisual.transform.localScale = Vector3.one * 1.5f;
 
         // Entferne Collider
-        Destroy(shieldVisual.GetComponent<Collider>());
+        Collider col = shieldVisual.GetComponent<Collider>();
+        if (col != null) Destroy(col);
 
-        // Grünes transparentes Material
+        // Einfaches grünes Material
         Renderer shieldRenderer = shieldVisual.GetComponent<Renderer>();
-        shieldRenderer.material = new Material(Shader.Find("Standard"));
-        shieldRenderer.material.color = new Color(0f, 1f, 0f, 0.3f);
-        shieldRenderer.material.SetFloat("_Mode", 3);
-        shieldRenderer.material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        shieldRenderer.material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        shieldRenderer.material.SetInt("_ZWrite", 0);
-        shieldRenderer.material.DisableKeyword("_ALPHATEST_ON");
-        shieldRenderer.material.EnableKeyword("_ALPHABLEND_ON");
-        shieldRenderer.material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-        shieldRenderer.material.renderQueue = 3000;
+        shieldRenderer.material.color = new Color(0f, 1f, 0f, 0.5f);
 
         shieldVisual.SetActive(false);
     }
+
 
     private void UpdateShieldVisual()
     {

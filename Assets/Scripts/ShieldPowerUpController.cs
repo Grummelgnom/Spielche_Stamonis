@@ -35,9 +35,11 @@ public class ShieldPowerUpController : NetworkBehaviour
         OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
         if (player != null && !player.isDead.Value)
         {
-            Debug.Log($"Player {player.Owner.ClientId} picked up Shield PowerUp!");
+            Debug.Log($"PowerUp: Player {player.Owner.ClientId} picked up Shield! Calling ActivateShieldServerRpc...");
             player.ActivateShieldServerRpc(shieldDuration);
+            Debug.Log($"PowerUp: ActivateShieldServerRpc called! Despawning PowerUp...");
             ServerManager.Despawn(gameObject);
         }
     }
+
 }
