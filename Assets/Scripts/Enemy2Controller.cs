@@ -108,7 +108,9 @@ public class Enemy2Controller : NetworkBehaviour
     {
         Debug.Log($"Enemy2 died! Killer: {killerClientId}");
 
-        // Gib Punkte an den Killer
+        // Camera Shake auf allen Clients
+        ShakeCameraObserversRpc();
+
         if (killerClientId >= 0)
         {
             OwnPlayerController[] players = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None);
@@ -126,6 +128,15 @@ public class Enemy2Controller : NetworkBehaviour
         if (IsServerInitialized)
         {
             ServerManager.Despawn(gameObject);
+        }
+    }
+
+    [ObserversRpc]
+    private void ShakeCameraObserversRpc()
+    {
+        if (CameraShake.Instance != null)
+        {
+            CameraShake.Instance.Shake(0.2f, 0.15f);
         }
     }
 }

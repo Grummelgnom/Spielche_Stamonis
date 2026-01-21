@@ -155,6 +155,9 @@ public class EnemyController : NetworkBehaviour
     {
         Debug.Log($"Enemy1 died! Killer: {killerClientId}");
 
+        // Camera Shake auf allen Clients
+        ShakeCameraObserversRpc();
+
         if (killerClientId >= 0)
         {
             OwnPlayerController[] players = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None);
@@ -172,6 +175,15 @@ public class EnemyController : NetworkBehaviour
         if (IsServerInitialized)
         {
             ServerManager.Despawn(gameObject);
+        }
+    }
+
+    [ObserversRpc]
+    private void ShakeCameraObserversRpc()
+    {
+        if (CameraShake.Instance != null)
+        {
+            CameraShake.Instance.Shake(0.2f, 0.15f);
         }
     }
 }
