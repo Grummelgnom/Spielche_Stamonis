@@ -131,4 +131,36 @@ public class EnemySpawner : NetworkBehaviour
         else
             waveCountdownText.text = "";
     }
+    [Header("PowerUp Settings")]
+    [SerializeField] private GameObject shieldPowerUpPrefab;
+    [SerializeField] private int powerUpScoreInterval = 50;  // Alle 50 Punkte
+    private int lastPowerUpScore = 0;
+
+    // Entferne die Update() Methode wenn du sie für PowerUp hinzugefügt hattest!
+
+    public void CheckPowerUpSpawn(int playerScore)
+    {
+        if (!IsServerInitialized) return;
+
+        // Spawn PowerUp wenn Spieler Score-Intervall erreicht
+        if (playerScore >= lastPowerUpScore + powerUpScoreInterval && shieldPowerUpPrefab != null)
+        {
+            lastPowerUpScore = playerScore;
+            SpawnPowerUp();
+            Debug.Log($"PowerUp spawned! Next at score: {lastPowerUpScore + powerUpScoreInterval}");
+        }
+    }
+
+    private void SpawnPowerUp()
+    {
+        float randomX = UnityEngine.Random.Range(spawnAreaMin.x, spawnAreaMax.x);
+        Vector3 spawnPos = new Vector3(randomX, spawnAreaMax.y, 0f);
+
+        GameObject powerUp = Instantiate(shieldPowerUpPrefab, spawnPos, Quaternion.identity);
+        ServerManager.Spawn(powerUp);
+
+        Debug.Log($"Shield PowerUp spawned at {spawnPos}!");
+    }
+
+
 }

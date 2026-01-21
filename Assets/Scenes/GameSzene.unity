@@ -2228,6 +2228,8 @@ MonoBehaviour:
   spawnAreaMin: {x: -8, y: 5}
   spawnAreaMax: {x: 8, y: 8}
   waveCountdownText: {fileID: 1638755075}
+  shieldPowerUpPrefab: {fileID: 5330596597015337650, guid: adaed396c7e95464c993090328e20cc8, type: 3}
+  powerUpScoreInterval: 20
 --- !u!4 &1430181154
 Transform:
   m_ObjectHideFlags: 0

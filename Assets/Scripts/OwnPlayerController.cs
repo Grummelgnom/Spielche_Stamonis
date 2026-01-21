@@ -15,8 +15,10 @@ public class OwnPlayerController : NetworkBehaviour
     public readonly SyncVar<int> lives = new SyncVar<int>(3);
     public readonly SyncVar<bool> isDead = new SyncVar<bool>(false);
     public readonly SyncVar<int> score = new SyncVar<int>(0);
+    public readonly SyncVar<bool> hasShield = new SyncVar<bool>(false);
 
     private Renderer playerRenderer;
+    private GameObject shieldVisual;
 
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float minY = -4f;
@@ -47,8 +49,10 @@ public class OwnPlayerController : NetworkBehaviour
         base.OnStartNetwork();
         lives.OnChange += OnLivesChanged;
         score.OnChange += OnScoreChanged;
+        hasShield.OnChange += OnShieldChanged;
         UpdateLivesUI();
         UpdateScoreUI();
+        CreateShieldVisual();
     }
 
     public override void OnStopNetwork()
@@ -56,6 +60,7 @@ public class OwnPlayerController : NetworkBehaviour
         base.OnStopNetwork();
         lives.OnChange -= OnLivesChanged;
         score.OnChange -= OnScoreChanged;
+        hasShield.OnChange -= OnShieldChanged;
     }
 
     private void OnDisable()
@@ -248,10 +253,77 @@ public class OwnPlayerController : NetworkBehaviour
     }
     #endregion
 
+    #region Shield
+    [ServerRpc]
+    public void ActivateShieldServerRpc(float duration)
+    {
+        if (isDead.Value) return;
+
+        hasShield.Value = true;
+        Debug.Log($"Player {Owner.ClientId} activated shield for {duration} seconds!");
+
+        Invoke(nameof(DeactivateShield), duration);
+    }
+
+    private void DeactivateShield()
+    {
+        hasShield.Value = false;
+        Debug.Log($"Player {Owner.ClientId} shield deactivated!");
+    }
+
+    private void OnShieldChanged(bool prev, bool next, bool asServer)
+    {
+        UpdateShieldVisual();
+    }
+
+    private void CreateShieldVisual()
+    {
+        // Erstelle grünen Ring um Player
+        shieldVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        shieldVisual.name = "ShieldVisual";
+        shieldVisual.transform.SetParent(transform);
+        shieldVisual.transform.localPosition = Vector3.zero;
+        shieldVisual.transform.localScale = Vector3.one * 1.5f;
+
+        // Entferne Collider
+        Destroy(shieldVisual.GetComponent<Collider>());
+
+        // Grünes transparentes Material
+        Renderer shieldRenderer = shieldVisual.GetComponent<Renderer>();
+        shieldRenderer.material = new Material(Shader.Find("Standard"));
+        shieldRenderer.material.color = new Color(0f, 1f, 0f, 0.3f);
+        shieldRenderer.material.SetFloat("_Mode", 3);
+        shieldRenderer.material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        shieldRenderer.material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        shieldRenderer.material.SetInt("_ZWrite", 0);
+        shieldRenderer.material.DisableKeyword("_ALPHATEST_ON");
+        shieldRenderer.material.EnableKeyword("_ALPHABLEND_ON");
+        shieldRenderer.material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        shieldRenderer.material.renderQueue = 3000;
+
+        shieldVisual.SetActive(false);
+    }
+
+    private void UpdateShieldVisual()
+    {
+        if (shieldVisual != null)
+        {
+            shieldVisual.SetActive(hasShield.Value);
+        }
+    }
+    #endregion
+
     #region Health
     [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc()
     {
+        // Shield blockt Schaden!
+        if (hasShield.Value)
+        {
+            Debug.Log($"Player {Owner.ClientId} blocked damage with shield!");
+            return;
+        }
+
         lives.Value--;
         Debug.Log($"Player {Owner.ClientId} took damage! Lives: {lives.Value}");
 
@@ -313,6 +385,13 @@ public class OwnPlayerController : NetworkBehaviour
         if (!IsServerInitialized) return;
         score.Value += points;
         Debug.Log($"Player {Owner.ClientId} score: {score.Value}");
+
+        // Check für PowerUp Spawn
+        EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
+        if (spawner != null)
+        {
+            spawner.CheckPowerUpSpawn(score.Value);
+        }
     }
 
     private void OnScoreChanged(int prev, int next, bool asServer)
