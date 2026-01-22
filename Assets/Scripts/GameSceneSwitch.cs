@@ -3,7 +3,7 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // Hänge das Skript an dein Canvas oder ein leeres GameObject in der MainMenu- oder GameOver-Scene
-public class MenuManager : MonoBehaviour
+public class GameSceneSwitch : MonoBehaviour
 {
     [Header("Buttons (Drag hier rein)")]
     public Button newGameButton;
