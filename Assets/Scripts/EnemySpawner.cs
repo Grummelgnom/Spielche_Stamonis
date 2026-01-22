@@ -83,7 +83,7 @@ public class EnemySpawner : NetworkBehaviour
         Debug.Log($"Wave {currentWave} complete!");
 
         // Countdown für nächste Wave
-        for (int i = 10; i >= 1; i--)
+        for (int i = 3; i >= 1; i--)
         {
             countdownSeconds.Value = i;
             yield return new WaitForSeconds(1f);
@@ -127,7 +127,7 @@ public class EnemySpawner : NetworkBehaviour
         if (waveCountdownText == null) return;
 
         if (countdownSeconds.Value > 0)
-            waveCountdownText.text = $"NÄCHSTE WELLE IN: {countdownSeconds.Value}";
+            waveCountdownText.text = $"NEXT WAVE IN : {countdownSeconds.Value}";
         else
             waveCountdownText.text = "";
     }
@@ -138,18 +138,16 @@ public class EnemySpawner : NetworkBehaviour
 
     // Entferne die Update() Methode wenn du sie für PowerUp hinzugefügt hattest!
 
-    public void CheckPowerUpSpawn(int playerScore)
+    public void SpawnPowerUpNow()
     {
         if (!IsServerInitialized) return;
 
-        // Spawn PowerUp wenn Spieler Score-Intervall erreicht
-        if (playerScore >= lastPowerUpScore + powerUpScoreInterval && shieldPowerUpPrefab != null)
+        if (shieldPowerUpPrefab != null)
         {
-            lastPowerUpScore = playerScore;
             SpawnPowerUp();
-            Debug.Log($"PowerUp spawned! Next at score: {lastPowerUpScore + powerUpScoreInterval}");
         }
     }
+
 
     private void SpawnPowerUp()
     {

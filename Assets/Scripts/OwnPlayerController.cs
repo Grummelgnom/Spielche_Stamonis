@@ -19,6 +19,10 @@ public class OwnPlayerController : NetworkBehaviour
 
     private Renderer playerRenderer;
     private GameObject shieldVisual;
+    private int lastPowerUpScore = 0;
+    
+    [Header("PowerUp Settings")]
+    [SerializeField] private int powerUpScoreInterval = 50;  // Im Inspector einstellbar!
 
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float minY = -4f;
@@ -263,9 +267,47 @@ public class OwnPlayerController : NetworkBehaviour
 
         hasShield.Value = true;
 
+        // Starte Flackern auf ALLEN Clients
+        float flickerStartTime = duration - 2f;
+        if (flickerStartTime > 0)
+        {
+            StartFlickerObserversRpc(flickerStartTime);
+        }
+
         Invoke(nameof(DeactivateShield), duration);
     }
 
+    [ObserversRpc]
+    private void StartFlickerObserversRpc(float delay)
+    {
+        Invoke(nameof(StartFlickerLocal), delay);
+    }
+
+    private void StartFlickerLocal()
+    {
+        if (shieldVisual != null)
+        {
+            StartCoroutine(FlickerShield());
+        }
+    }
+
+    private IEnumerator FlickerShield()
+    {
+        while (hasShield.Value)
+        {
+            if (shieldVisual != null)
+            {
+                shieldVisual.SetActive(!shieldVisual.activeSelf);
+            }
+            yield return new WaitForSeconds(0.2f);
+        }
+
+        // Stelle sicher dass Shield am Ende aus ist
+        if (shieldVisual != null)
+        {
+            shieldVisual.SetActive(false);
+        }
+    }
 
     private void DeactivateShield()
     {
@@ -280,23 +322,25 @@ public class OwnPlayerController : NetworkBehaviour
 
     private void CreateShieldVisual()
     {
-        // Erstelle grünen Ring um Player (einfacher!)
         shieldVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         shieldVisual.name = "ShieldVisual";
         shieldVisual.transform.SetParent(transform);
         shieldVisual.transform.localPosition = Vector3.zero;
         shieldVisual.transform.localScale = Vector3.one * 1.5f;
 
-        // Entferne Collider
         Collider col = shieldVisual.GetComponent<Collider>();
         if (col != null) Destroy(col);
 
-        // Einfaches grünes Material
         Renderer shieldRenderer = shieldVisual.GetComponent<Renderer>();
-        shieldRenderer.material.color = new Color(0f, 1f, 0f, 0.5f);
+
+        // Verwende Transparent Shader
+        Material shieldMat = new Material(Shader.Find("Sprites/Default"));
+        shieldMat.color = new Color(0f, 1f, 0f, 0.01f);  // Grün, 30% sichtbar
+        shieldRenderer.material = shieldMat;
 
         shieldVisual.SetActive(false);
     }
+
 
 
     private void UpdateShieldVisual()
@@ -381,13 +425,24 @@ public class OwnPlayerController : NetworkBehaviour
         score.Value += points;
         Debug.Log($"Player {Owner.ClientId} score: {score.Value}");
 
-        // Check für PowerUp Spawn
+        // Check für eigenes PowerUp (alle 50 Punkte)
+        if (score.Value >= lastPowerUpScore + powerUpScoreInterval)
+        {
+            lastPowerUpScore = score.Value;
+            SpawnPowerUpForMe();
+        }
+    }
+
+    private void SpawnPowerUpForMe()
+    {
         EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
         if (spawner != null)
         {
-            spawner.CheckPowerUpSpawn(score.Value);
+            spawner.SpawnPowerUpNow();
+            Debug.Log($"Player {Owner.ClientId} spawned PowerUp at score {score.Value}!");
         }
     }
+
 
     private void OnScoreChanged(int prev, int next, bool asServer)
     {
