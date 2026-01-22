@@ -1,4 +1,5 @@
-﻿using FishNet.Object;
+﻿using FishNet.Connection;
+using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using System.Collections;
 using TMPro;
@@ -426,9 +427,15 @@ public class OwnPlayerController : NetworkBehaviour
 
     private void Die()
     {
-        Debug.Log($"Player {Owner.ClientId} died! GAME OVER!");
+        Debug.Log($"Player {Owner.ClientId} died! GAME OVER! Final Score: {score.Value}");
 
         isDead.Value = true;
+
+        // Submit auf dem Owner-Client via TargetRpc
+        if (IsServerInitialized)
+        {
+            SubmitScoreTargetRpc(Owner, score.Value);
+        }
 
         DisablePlayerObserversRpc();
 
@@ -438,6 +445,40 @@ public class OwnPlayerController : NetworkBehaviour
             gameManager.OnPlayerDied(Owner.ClientId);
         }
     }
+
+    [TargetRpc]
+    private void SubmitScoreTargetRpc(NetworkConnection conn, int finalScore)
+    {
+        Debug.Log($"SubmitScoreTargetRpc called! Owner.ClientId={Owner.ClientId}, finalScore={finalScore}");
+
+        if (HighscoreClient.Instance != null)
+        {
+            string playerName = OwnNetworkGameManager.Instance.Player1.Value;
+            if (Owner.ClientId == 1)
+                playerName = OwnNetworkGameManager.Instance.Player2.Value;
+
+            Debug.Log($"Player Name: '{playerName}' (Length: {playerName?.Length ?? 0})");
+            Debug.Log($"Final Score: {finalScore}");
+
+            // Falls Name leer, verwende Default
+            if (string.IsNullOrEmpty(playerName))
+            {
+                playerName = $"Player{Owner.ClientId}";
+                Debug.LogWarning($"Name was empty! Using default: {playerName}");
+            }
+
+            Debug.Log($"Submitting score: Name={playerName}, Score={finalScore}");
+            HighscoreClient.Instance.SubmitScore(playerName, finalScore);
+        }
+        else
+        {
+            Debug.LogError("HighscoreClient.Instance is NULL!");
+        }
+    }
+
+
+
+
 
     [ObserversRpc]
     private void DisablePlayerObserversRpc()
