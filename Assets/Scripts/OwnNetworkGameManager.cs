@@ -69,6 +69,29 @@ public class OwnNetworkGameManager : NetworkBehaviour
         scoreP1.Value = 0;
         scoreP2.Value = 0;
     }
+
+    private void Start()
+    {
+        // Verstecke UI bis verbunden
+        if (PlayerNameField != null)
+            PlayerNameField.gameObject.SetActive(false);
+        if (ReadyButton != null)
+            ReadyButton.gameObject.SetActive(false);
+    }
+
+    public override void OnStartClient()
+    {
+        base.OnStartClient();
+
+        // Zeige UI nach Connection
+        if (PlayerNameField != null)
+            PlayerNameField.gameObject.SetActive(true);
+        if (ReadyButton != null)
+            ReadyButton.gameObject.SetActive(true);
+
+        Debug.Log("Client connected - UI shown!");
+    }
+
     public void OnPlayerDied(int clientId)
     {
         Debug.Log($"Player {clientId} has died! Game Over for this player!");

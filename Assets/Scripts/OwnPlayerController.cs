@@ -449,32 +449,34 @@ public class OwnPlayerController : NetworkBehaviour
     [TargetRpc]
     private void SubmitScoreTargetRpc(NetworkConnection conn, int finalScore)
     {
-        Debug.Log($"SubmitScoreTargetRpc called! Owner.ClientId={Owner.ClientId}, finalScore={finalScore}");
-
         if (HighscoreClient.Instance != null)
         {
             string playerName = OwnNetworkGameManager.Instance.Player1.Value;
             if (Owner.ClientId == 1)
                 playerName = OwnNetworkGameManager.Instance.Player2.Value;
 
-            Debug.Log($"Player Name: '{playerName}' (Length: {playerName?.Length ?? 0})");
-            Debug.Log($"Final Score: {finalScore}");
-
-            // Falls Name leer, verwende Default
             if (string.IsNullOrEmpty(playerName))
             {
                 playerName = $"Player{Owner.ClientId}";
-                Debug.LogWarning($"Name was empty! Using default: {playerName}");
             }
 
             Debug.Log($"Submitting score: Name={playerName}, Score={finalScore}");
             HighscoreClient.Instance.SubmitScore(playerName, finalScore);
-        }
-        else
-        {
-            Debug.LogError("HighscoreClient.Instance is NULL!");
+
+            // Zeige Highscore-Liste nach 1 Sekunde
+            Invoke(nameof(ShowHighscoreList), 1f);
         }
     }
+
+    private void ShowHighscoreList()
+    {
+        HighscoreDisplay display = FindFirstObjectByType<HighscoreDisplay>();
+        if (display != null)
+        {
+            display.ShowHighscores();
+        }
+    }
+
 
 
 
