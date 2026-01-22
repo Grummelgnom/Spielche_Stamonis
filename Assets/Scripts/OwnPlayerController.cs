@@ -15,6 +15,13 @@ public class OwnPlayerController : NetworkBehaviour
     public readonly SyncVar<int> lives = new SyncVar<int>(3);
     public readonly SyncVar<bool> isDead = new SyncVar<bool>(false);
     public readonly SyncVar<int> score = new SyncVar<int>(0);
+    [Header("Ultimate")]
+    public readonly SyncVar<float> ultimateMeter = new SyncVar<float>(0f);
+    [SerializeField] private float ultimateChargePerKill = 10f;  // Pro Kill +10%
+    [SerializeField] private float ultimateDrainRate = 20f;      // 20% pro Sekunde
+    [SerializeField] private float rapidFireRate = 0.05f;        // Sehr schnell!
+    private bool ultimateActive = false;
+
     public readonly SyncVar<bool> hasShield = new SyncVar<bool>(false);
 
     private Renderer playerRenderer;
@@ -34,13 +41,18 @@ public class OwnPlayerController : NetworkBehaviour
     [SerializeField] private InputAction moveAction;
     [SerializeField] private InputAction colorChangeAction;
 
+
+
     [Header("Shooting")]
     [SerializeField] private InputAction shootSingleAction;
     [SerializeField] private InputAction shootSpreadAction;
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform firePoint;
+    [SerializeField] private float fireRate = 0.2f;  // ← DIESE ZEILE HINZUFÜGEN!
+    private float nextFireTime = 0f;                  // ← DIESE ZEILE HINZUFÜGEN!
     private bool wasSinglePressed = false;
     private bool wasSpreadPressed = false;
+
 
     [Header("Player UI")]
     [SerializeField] private TextMeshPro playerIndexText;
@@ -54,10 +66,13 @@ public class OwnPlayerController : NetworkBehaviour
         lives.OnChange += OnLivesChanged;
         score.OnChange += OnScoreChanged;
         hasShield.OnChange += OnShieldChanged;
+        ultimateMeter.OnChange += OnUltimateChanged;  // ← NEU
         UpdateLivesUI();
         UpdateScoreUI();
+        UpdateUltimateUI();  // ← NEU
         CreateShieldVisual();
     }
+
 
     public override void OnStopNetwork()
     {
@@ -65,6 +80,8 @@ public class OwnPlayerController : NetworkBehaviour
         lives.OnChange -= OnLivesChanged;
         score.OnChange -= OnScoreChanged;
         hasShield.OnChange -= OnShieldChanged;
+        ultimateMeter.OnChange -= OnUltimateChanged;
+
     }
 
     private void OnDisable()
@@ -189,22 +206,57 @@ public class OwnPlayerController : NetworkBehaviour
     #region Shooting
     private void HandleShooting()
     {
-        // Single Shot - Linke Maustaste
         bool isSinglePressed = shootSingleAction.IsPressed();
-        if (isSinglePressed && !wasSinglePressed)
+        bool isSpreadPressed = shootSpreadAction.IsPressed();
+
+        // Ultimate Mode - läuft bis Meter leer!
+        if (ultimateActive)
+        {
+            // Schieße wenn Linke Maus gedrückt
+            if (isSinglePressed)
+            {
+                ShootServerRpc(1);
+            }
+
+            // Entlade immer (auch ohne Schuss!)
+            DrainUltimateServerRpc(ultimateDrainRate * (float)TimeManager.TickDelta);
+
+            // Deaktiviere wenn leer
+            if (ultimateMeter.Value <= 0f)
+            {
+                ultimateActive = false;
+                Debug.Log("Ultimate deactivated - meter empty!");
+            }
+
+            return;
+        }
+
+        // Ultimate starten bei 100%
+        if (isSinglePressed && ultimateMeter.Value >= 100f && !ultimateActive)
+        {
+            ultimateActive = true;
+            Debug.Log("ULTIMATE ACTIVATED!");
+            return;
+        }
+
+        // Normal Shooting
+        if (isSinglePressed && !wasSinglePressed && Time.time >= nextFireTime)
         {
             ShootServerRpc(1);
+            nextFireTime = Time.time + fireRate;
         }
         wasSinglePressed = isSinglePressed;
 
-        // Spread Shot - Rechte Maustaste  
-        bool isSpreadPressed = shootSpreadAction.IsPressed();
-        if (isSpreadPressed && !wasSpreadPressed)
+        if (isSpreadPressed && !wasSpreadPressed && Time.time >= nextFireTime)
         {
             ShootServerRpc(2);
+            nextFireTime = Time.time + fireRate;
         }
         wasSpreadPressed = isSpreadPressed;
     }
+
+
+
 
     [ServerRpc]
     private void ShootServerRpc(int pattern)
@@ -425,13 +477,17 @@ public class OwnPlayerController : NetworkBehaviour
         score.Value += points;
         Debug.Log($"Player {Owner.ClientId} score: {score.Value}");
 
-        // Check für eigenes PowerUp (alle 50 Punkte)
+        // Lade Ultimate Meter auf
+        ChargeUltimate(ultimateChargePerKill);
+
+        // Check für eigenes PowerUp
         if (score.Value >= lastPowerUpScore + powerUpScoreInterval)
         {
             lastPowerUpScore = score.Value;
             SpawnPowerUpForMe();
         }
     }
+
 
     private void SpawnPowerUpForMe()
     {
@@ -483,4 +539,86 @@ public class OwnPlayerController : NetworkBehaviour
         playerRenderer.material.color = newColor;
     }
     #endregion
+    #region Ultimate
+    private Coroutine blinkCoroutine = null;
+
+    public void ChargeUltimate(float amount)
+    {
+        if (!IsServerInitialized) return;
+
+        // Nicht aufladen während Ultimate aktiv!
+        if (ultimateActive) return;
+
+        ultimateMeter.Value = Mathf.Clamp(ultimateMeter.Value + amount, 0f, 100f);
+        Debug.Log($"Player {Owner.ClientId} ultimate charged: {ultimateMeter.Value}%");
+    }
+
+    [ServerRpc]
+    private void DrainUltimateServerRpc(float amount)
+    {
+        ultimateMeter.Value = Mathf.Max(0f, ultimateMeter.Value - amount);
+    }
+
+    private void OnUltimateChanged(float prev, float next, bool asServer)
+    {
+        UpdateUltimateUI();
+
+        // Blinken nur für Owner
+        if (!IsOwner) return;
+
+        // Starte Blinken bei 100%
+        if (next >= 100f && blinkCoroutine == null)
+        {
+            blinkCoroutine = StartCoroutine(BlinkUltimateSlider());
+        }
+        // Stoppe Blinken wenn unter 100%
+        else if (next < 100f && blinkCoroutine != null)
+        {
+            StopCoroutine(blinkCoroutine);
+            blinkCoroutine = null;
+
+            // Setze Farbe zurück
+            UnityEngine.UI.Slider slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
+            if (slider != null)
+            {
+                UnityEngine.UI.Image fillImage = slider.fillRect?.GetComponent<UnityEngine.UI.Image>();
+                if (fillImage != null)
+                {
+                    fillImage.color = Color.yellow;
+                }
+            }
+        }
+    }
+
+    private void UpdateUltimateUI()
+    {
+        if (!IsOwner) return;
+
+        UnityEngine.UI.Slider ultimateUI = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
+        if (ultimateUI != null)
+        {
+            ultimateUI.value = ultimateMeter.Value;
+        }
+    }
+
+    private IEnumerator BlinkUltimateSlider()
+    {
+        UnityEngine.UI.Slider slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
+        if (slider == null) yield break;
+
+        UnityEngine.UI.Image fillImage = slider.fillRect?.GetComponent<UnityEngine.UI.Image>();
+        if (fillImage == null) yield break;
+
+        while (true)
+        {
+            fillImage.color = Color.yellow;
+            yield return new WaitForSeconds(0.3f);
+            fillImage.color = Color.red;
+            yield return new WaitForSeconds(0.3f);
+        }
+    }
+    #endregion
+
+
+
 }
