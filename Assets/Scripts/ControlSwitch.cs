@@ -6,16 +6,15 @@ using UnityEngine.UI;
 public class ControlSwitch : MonoBehaviour
 {
     [Header("Buttons (Drag hier rein)")]
-    public Button controlButton;
+    public Button controlsButton;
 
     void Start()
     {
         // Listener für die Buttons setzen
-        if (controlButton != null)
-            controlButton.onClick.AddListener(NewGame);
+        if (controlsButton != null)
+            controlsButton.onClick.AddListener(NewGame);
     }
 
-    // "New Game" / Restart: Einfach die Game-Scene laden
     public void NewGame()
     {
         SceneManager.LoadScene("Controls");  // Control Szene wird geladen

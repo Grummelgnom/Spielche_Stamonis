@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// Hänge das Skript an dein Canvas oder ein leeres GameObject in der MainMenu- oder GameOver-Scene
 public class LobbySwitch : MonoBehaviour
 {
     [Header("Buttons (Drag hier rein)")]
