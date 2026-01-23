@@ -5,13 +5,13 @@ using UnityEngine.UI;
 public class GameSceneSwitch : MonoBehaviour
 {
     [Header("Buttons (Drag hier rein)")]
-    public Button newGameButton;
+    public Button StartGameButton;
 
     void Start()
     {
         // Listener für die Buttons setzen
-        if (newGameButton != null)
-            newGameButton.onClick.AddListener(NewGame);
+        if (StartGameButton != null)
+            StartGameButton.onClick.AddListener(NewGame);
     }
 
     // "New Game" / Restart: Einfach die Game-Scene laden

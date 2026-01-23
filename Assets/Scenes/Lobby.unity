@@ -1360,7 +1360,7 @@ GameObject:
   - component: {fileID: 1590497379}
   - component: {fileID: 1590497378}
   m_Layer: 5
-  m_Name: Ready
+  m_Name: StartGame
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1642,7 +1642,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5f3709647745c9e4e99baa826b149321, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  newGameButton: {fileID: 0}
+  StartGameButton: {fileID: 1590497378}
 --- !u!4 &1805332517
 Transform:
   m_ObjectHideFlags: 0
