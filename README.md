@@ -12,24 +12,12 @@ Entwicklung eines **spielbaren 2-Spieler-Arcade-Bullethell-Spiels** aus der Top-
 Das Spiel muss **online im Multiplayer (Host + Client)** funktionieren und alle unten aufgeführten **Pflichtanforderungen** erfüllen.
 _____________________________________________________________________________
 #### Wichtig !!!! #####
-
-
-
-
+Zum Spielstart auf Start Game drücken, nicht vorher den Server starten!
+Danach den Clienten. Client 2 muckt rum. Hier muss 3 mal auf client start/stopt/start gedrückt werden,
+damit das Namensfeld und der Ready Button erscheint.
+Auch "relativ" wichtig - den Screen nicht zu klein zu haben ... sonst zeigt der zweite Client
+das Namensfeld nicht im Screen.
 _____________________________________________________________________________
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ## Technische Umsetzung & Erfüllung der Pflichtanforderungen (80 Punkte)
