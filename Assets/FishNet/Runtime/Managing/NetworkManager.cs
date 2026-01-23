@@ -209,6 +209,9 @@ namespace FishNet.Managing
         /// Object pool to use for this NetworkManager. Value may be null.
         /// </summary>
         public ObjectPool ObjectPool => _objectPool;
+
+        public bool IsOnline { get; set; }
+
         [Tooltip("Object pool to use for this NetworkManager. Value may be null.")]
         [SerializeField]
         private ObjectPool _objectPool;
