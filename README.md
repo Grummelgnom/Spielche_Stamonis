@@ -12,6 +12,11 @@ Entwicklung eines **spielbaren 2-Spieler-Arcade-Bullethell-Spiels** aus der Top-
 Das Spiel muss **online im Multiplayer (Host + Client)** funktionieren und alle unten aufgeführten **Pflichtanforderungen** erfüllen.
 _____________________________________________________________________________
 #### Wichtig !!!! #####
+
+Wir haben auf den letzten Drücker den Wave-Text verloren, und konnten es nicht mehr fixen.
+Das Feature ist jetzt nicht in Main, aber es kann in Simonis5 begutachtet werden.
+
+
 Zum Spielstart auf Start Game drücken, nicht vorher den Server starten!
 Danach den Clienten. Client 2 muckt rum. Hier muss 3 mal auf client start/stopt/start gedrückt werden,
 damit das Namensfeld und der Ready Button erscheint.
