@@ -1584,7 +1584,7 @@ MonoBehaviour:
   player1NameText: {fileID: 1890877236}
   player2NameText: {fileID: 2146365178}
   PlayerNameField: {fileID: 1224880644}
-  ReadyButton: {fileID: 1382216393}
+  StartButton: {fileID: 1382216393}
 --- !u!1001 &1116096142
 PrefabInstance:
   m_ObjectHideFlags: 0
