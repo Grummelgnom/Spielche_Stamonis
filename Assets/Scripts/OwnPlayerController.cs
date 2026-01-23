@@ -1,5 +1,4 @@
-﻿using FishNet.Connection;
-using FishNet.Object;
+﻿using FishNet.Object;
 using FishNet.Object.Synchronizing;
 using System.Collections;
 using TMPro;
@@ -8,30 +7,26 @@ using UnityEngine.InputSystem;
 
 public class OwnPlayerController : NetworkBehaviour
 {
+    [Header("SyncVars")]
     private readonly SyncVar<Color> playerColor = new SyncVar<Color>();
     private readonly SyncVar<bool> isReady = new SyncVar<bool>();
     public bool IsReady => isReady.Value;
 
-    [Header("Health")]
+    [Header("Health & Score")]
     public readonly SyncVar<int> lives = new SyncVar<int>(3);
     public readonly SyncVar<bool> isDead = new SyncVar<bool>(false);
     public readonly SyncVar<int> score = new SyncVar<int>(0);
-    [Header("Ultimate")]
-    public readonly SyncVar<float> ultimateMeter = new SyncVar<float>(0f);
-    [SerializeField] private float ultimateChargePerKill = 10f;  // Pro Kill +10%
-    [SerializeField] private float ultimateDrainRate = 20f;      // 20% pro Sekunde
-    [SerializeField] private float rapidFireRate = 0.05f;        // Sehr schnell!
-    private bool ultimateActive = false;
-
     public readonly SyncVar<bool> hasShield = new SyncVar<bool>(false);
-
-    private Renderer playerRenderer;
-    private GameObject shieldVisual;
     private int lastPowerUpScore = 0;
-    
-    [Header("PowerUp Settings")]
-    [SerializeField] private int powerUpScoreInterval = 50;  // Im Inspector einstellbar!
 
+    [Header("Ultimate Settings")]
+    public readonly SyncVar<float> ultimateMeter = new SyncVar<float>(0f);
+    [SerializeField] private float ultimateDrainRate = 20f;
+    [SerializeField] private int powerUpScoreInterval = 50;
+    private bool ultimateActive = false;
+    private Coroutine blinkCoroutine = null;
+
+    [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 5f;
     [SerializeField] private float minY = -4f;
     [SerializeField] private float maxY = 4f;
@@ -41,39 +36,39 @@ public class OwnPlayerController : NetworkBehaviour
     [Header("Input System")]
     [SerializeField] private InputAction moveAction;
     [SerializeField] private InputAction colorChangeAction;
-
-
+    [SerializeField] private InputAction readyAction; // Falls du R nutzen willst
 
     [Header("Shooting")]
-    [SerializeField] private InputAction shootSingleAction;
-    [SerializeField] private InputAction shootSpreadAction;
+    [SerializeField] private InputAction shootSingleAction; // Linke Maus
+    [SerializeField] private InputAction shootSpreadAction; // Rechte Maus
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform firePoint;
-    [SerializeField] private float fireRate = 0.2f;  // ← DIESE ZEILE HINZUFÜGEN!
-    private float nextFireTime = 0f;                  // ← DIESE ZEILE HINZUFÜGEN!
+    [SerializeField] private float fireRate = 0.2f;
+    private float nextFireTime = 0f;
     private bool wasSinglePressed = false;
     private bool wasSpreadPressed = false;
 
-
-    [Header("Player UI")]
+    [Header("Player UI & Visuals")]
     [SerializeField] private TextMeshPro playerIndexText;
+    private Renderer playerRenderer;
+    private GameObject shieldVisual;
     private PlayerInput _playerInput;
 
-
-    #region Inits
+    #region Inits & Network
     public override void OnStartNetwork()
     {
         base.OnStartNetwork();
         lives.OnChange += OnLivesChanged;
         score.OnChange += OnScoreChanged;
         hasShield.OnChange += OnShieldChanged;
-        ultimateMeter.OnChange += OnUltimateChanged;  // ← NEU
+        ultimateMeter.OnChange += OnUltimateChanged;
+        playerColor.OnChange += OnColorChanged;
+
         UpdateLivesUI();
         UpdateScoreUI();
-        UpdateUltimateUI();  // ← NEU
+        UpdateUltimateUI();
         CreateShieldVisual();
     }
-
 
     public override void OnStopNetwork()
     {
@@ -82,14 +77,12 @@ public class OwnPlayerController : NetworkBehaviour
         score.OnChange -= OnScoreChanged;
         hasShield.OnChange -= OnShieldChanged;
         ultimateMeter.OnChange -= OnUltimateChanged;
-
+        playerColor.OnChange -= OnColorChanged;
     }
 
     private void OnDisable()
     {
-        playerColor.OnChange -= OnColorChanged;
         if (!IsOwner) return;
-
         moveAction?.Disable();
         colorChangeAction?.Disable();
         shootSingleAction?.Disable();
@@ -106,34 +99,33 @@ public class OwnPlayerController : NetworkBehaviour
 
     private IEnumerator DelayedIsOwner()
     {
-        playerColor.OnChange += OnColorChanged;
         playerRenderer = GetComponentInChildren<Renderer>();
-        playerRenderer.material = new Material(playerRenderer.material);
-        playerRenderer.material.color = playerColor.Value;
+        if (playerRenderer != null)
+        {
+            playerRenderer.material = new Material(playerRenderer.material);
+            playerRenderer.material.color = playerColor.Value;
+        }
 
         var pi = GetComponent<PlayerInput>();
-        Debug.Log($"pi = {pi}, text = {playerIndexText}");
         if (playerIndexText != null && pi != null)
         {
-            int index = pi.playerIndex;
-            playerIndexText.text = $"Player {index}";
+            playerIndexText.text = $"Player {pi.playerIndex}";
         }
 
         yield return null;
         if (IsOwner)
         {
-            ChangeColor(Random.value, Random.value, Random.value);
-
+            ChangeColorServerRpc(Random.value, Random.value, Random.value);
             moveAction?.Enable();
             colorChangeAction?.Enable();
             shootSingleAction?.Enable();
             shootSpreadAction?.Enable();
-            Debug.Log("Owner enabled all actions!");
             if (TimeManager != null)
                 TimeManager.OnTick += OnTick;
 
             UpdateLivesUI();
             UpdateScoreUI();
+            UpdateUltimateUI();
         }
     }
     #endregion
@@ -153,54 +145,50 @@ public class OwnPlayerController : NetworkBehaviour
         }
     }
 
-    #region ReadyStateHandling
+    #region Ready & Color
     [ServerRpc]
     public void SetReadyStateServerRpc(string name)
     {
         isReady.Value = !isReady.Value;
+        if (transform.position.x < 0) OwnNetworkGameManager.Instance.Player1.Value = name;
+        else OwnNetworkGameManager.Instance.Player2.Value = name;
 
-        if (transform.position.x < 0)
-        {
-            OwnNetworkGameManager.Instance.Player1.Value = name;
-        }
-        else
-        {
-            OwnNetworkGameManager.Instance.Player2.Value = name;
-        }
-
-        OwnNetworkGameManager.Instance.DisableNameField(Owner, isReady.Value);
         OwnNetworkGameManager.Instance.CheckAndStartGame();
         OwnNetworkGameManager.Instance.RpcUpdateReadyButtonText(isReady.Value);
     }
 
     [ServerRpc]
-    public void CmdSetReady(bool ready)
+    public void CmdSetReady(bool ready) { isReady.Value = ready; }
+
+    private void CheckForChangeColor()
     {
-        isReady.Value = ready;
-        Debug.Log($"Player {Owner.ClientId} ready: {ready}");
+        if (colorChangeAction == null || !colorChangeAction.triggered) return;
+        ChangeColorServerRpc(Random.value, Random.value, Random.value);
+    }
+
+    [ServerRpc]
+    private void ChangeColorServerRpc(float r, float g, float b) { playerColor.Value = new Color(r, g, b); }
+
+    private void OnColorChanged(Color prev, Color next, bool asServer)
+    {
+        if (playerRenderer != null) playerRenderer.material.color = next;
     }
     #endregion
 
     #region Movement
-    private void HandleInput()
-    {
-        Vector2 input = moveAction.ReadValue<Vector2>();
-        if (input.sqrMagnitude > 0f)
-            MoveServerRpc(input);
-    }
-
     [ServerRpc]
     private void MoveServerRpc(Vector2 input)
     {
         float dt = (float)TimeManager.TickDelta;
-
-        float newX = transform.position.x + input.x * moveSpeed * dt;
-        float newY = transform.position.y + input.y * moveSpeed * dt;
-
-        newX = Mathf.Clamp(newX, minX, maxX);
-        newY = Mathf.Clamp(newY, minY, maxY);
-
+        float newX = Mathf.Clamp(transform.position.x + input.x * moveSpeed * dt, minX, maxX);
+        float newY = Mathf.Clamp(transform.position.y + input.y * moveSpeed * dt, minY, maxY);
         transform.position = new Vector3(newX, newY, transform.position.z);
+    }
+
+    private void HandleInput()
+    {
+        Vector2 input = moveAction.ReadValue<Vector2>();
+        if (input.sqrMagnitude > 0f) MoveServerRpc(input);
     }
     #endregion
 
@@ -210,37 +198,22 @@ public class OwnPlayerController : NetworkBehaviour
         bool isSinglePressed = shootSingleAction.IsPressed();
         bool isSpreadPressed = shootSpreadAction.IsPressed();
 
-        // Ultimate Mode - läuft bis Meter leer!
+        // Ultimate Mode (Linke Maus halten bei 100%)
         if (ultimateActive)
         {
-            // Schieße wenn Linke Maus gedrückt
-            if (isSinglePressed)
-            {
-                ShootServerRpc(1);
-            }
-
-            // Entlade immer (auch ohne Schuss!)
+            if (isSinglePressed) ShootServerRpc(1);
             DrainUltimateServerRpc(ultimateDrainRate * (float)TimeManager.TickDelta);
-
-            // Deaktiviere wenn leer
-            if (ultimateMeter.Value <= 0f)
-            {
-                ultimateActive = false;
-                Debug.Log("Ultimate deactivated - meter empty!");
-            }
-
+            if (ultimateMeter.Value <= 0f) ultimateActive = false;
             return;
         }
 
-        // Ultimate starten bei 100%
         if (isSinglePressed && ultimateMeter.Value >= 100f && !ultimateActive)
         {
             ultimateActive = true;
-            Debug.Log("ULTIMATE ACTIVATED!");
             return;
         }
 
-        // Normal Shooting
+        // Normaler Schuss
         if (isSinglePressed && !wasSinglePressed && Time.time >= nextFireTime)
         {
             ShootServerRpc(1);
@@ -256,412 +229,170 @@ public class OwnPlayerController : NetworkBehaviour
         wasSpreadPressed = isSpreadPressed;
     }
 
-
-
-
     [ServerRpc]
     private void ShootServerRpc(int pattern)
     {
         Vector3 spawnPos = firePoint ? firePoint.position : transform.position;
         Vector2 baseDirection = Vector2.up;
 
-        if (pattern == 1)
-        {
-            // Single Shot
-            SpawnBullet(spawnPos, baseDirection);
-        }
+        if (pattern == 1) SpawnBullet(spawnPos, baseDirection);
         else if (pattern == 2)
         {
-            // Triple Shot - 3 Bullets im Fächer
-            Vector3 leftOffset = new Vector3(-0.4f, 0f, 0f);
-            Vector3 centerOffset = new Vector3(0f, 0f, 0f);
-            Vector3 rightOffset = new Vector3(0.4f, 0f, 0f);
-
-            SpawnBullet(spawnPos + leftOffset, Rotate(baseDirection, 30f));
-            SpawnBullet(spawnPos + centerOffset, baseDirection);
-            SpawnBullet(spawnPos + rightOffset, Rotate(baseDirection, -30f));
+            // Deine Fächer-Werte (30 und -30)
+            SpawnBullet(spawnPos + new Vector3(-0.4f, 0, 0), Rotate(baseDirection, 30f));
+            SpawnBullet(spawnPos, baseDirection);
+            SpawnBullet(spawnPos + new Vector3(0.4f, 0, 0), Rotate(baseDirection, -30f));
         }
+        PlaySoundObserversRpc(1);
     }
 
     private void SpawnBullet(Vector3 position, Vector2 direction)
     {
         GameObject bulletObj = Instantiate(bulletPrefab, position, Quaternion.identity);
-
-        BulletController bulletCtrl = bulletObj.GetComponent<BulletController>();
-        if (bulletCtrl != null)
-        {
-            bulletCtrl.InitializeBullet(direction);
-            bulletCtrl.shooterClientId = Owner.ClientId;
-        }
-
-        NetworkObject netObj = bulletObj.GetComponent<NetworkObject>();
-        if (netObj != null)
-        {
-            ServerManager.Spawn(bulletObj, Owner);
-        }
+        var bc = bulletObj.GetComponent<BulletController>();
+        if (bc != null) { bc.InitializeBullet(direction); bc.shooterClientId = Owner.ClientId; }
+        ServerManager.Spawn(bulletObj, Owner);
     }
 
     private Vector2 Rotate(Vector2 v, float degrees)
     {
         float radians = degrees * Mathf.Deg2Rad;
-        float cos = Mathf.Cos(radians);
         float sin = Mathf.Sin(radians);
+        float cos = Mathf.Cos(radians);
         return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
     }
     #endregion
 
-    #region Shield
-    [ServerRpc(RequireOwnership = false)]
-    public void ActivateShieldServerRpc(float duration)
-    {
-        if (isDead.Value) return;
-
-        Debug.Log($"SERVER: Activating shield for player {Owner.ClientId}, duration {duration}");
-
-        hasShield.Value = true;
-
-        // Starte Flackern auf ALLEN Clients
-        float flickerStartTime = duration - 2f;
-        if (flickerStartTime > 0)
-        {
-            StartFlickerObserversRpc(flickerStartTime);
-        }
-
-        Invoke(nameof(DeactivateShield), duration);
-    }
-
-    [ObserversRpc]
-    private void StartFlickerObserversRpc(float delay)
-    {
-        Invoke(nameof(StartFlickerLocal), delay);
-    }
-
-    private void StartFlickerLocal()
-    {
-        if (shieldVisual != null)
-        {
-            StartCoroutine(FlickerShield());
-        }
-    }
-
-    private IEnumerator FlickerShield()
-    {
-        while (hasShield.Value)
-        {
-            if (shieldVisual != null)
-            {
-                shieldVisual.SetActive(!shieldVisual.activeSelf);
-            }
-            yield return new WaitForSeconds(0.2f);
-        }
-
-        // Stelle sicher dass Shield am Ende aus ist
-        if (shieldVisual != null)
-        {
-            shieldVisual.SetActive(false);
-        }
-    }
-
-    private void DeactivateShield()
-    {
-        hasShield.Value = false;
-        Debug.Log($"Player {Owner.ClientId} shield deactivated!");
-    }
-
-    private void OnShieldChanged(bool prev, bool next, bool asServer)
-    {
-        UpdateShieldVisual();
-    }
-
-    private void CreateShieldVisual()
-    {
-        shieldVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        shieldVisual.name = "ShieldVisual";
-        shieldVisual.transform.SetParent(transform);
-        shieldVisual.transform.localPosition = Vector3.zero;
-        shieldVisual.transform.localScale = Vector3.one * 1.5f;
-
-        Collider col = shieldVisual.GetComponent<Collider>();
-        if (col != null) Destroy(col);
-
-        Renderer shieldRenderer = shieldVisual.GetComponent<Renderer>();
-
-        // Verwende Transparent Shader
-        Material shieldMat = new Material(Shader.Find("Sprites/Default"));
-        shieldMat.color = new Color(0f, 1f, 0f, 0.01f);  // Grün, 30% sichtbar
-        shieldRenderer.material = shieldMat;
-
-        shieldVisual.SetActive(false);
-    }
-
-
-
-    private void UpdateShieldVisual()
-    {
-        if (shieldVisual != null)
-        {
-            shieldVisual.SetActive(hasShield.Value);
-        }
-    }
-    #endregion
-
-    #region Health
+    #region Health, Shield & Score
     [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc()
     {
-        // Shield blockt Schaden!
-        if (hasShield.Value)
-        {
-            Debug.Log($"Player {Owner.ClientId} blocked damage with shield!");
-            return;
-        }
-
+        if (hasShield.Value) return;
         lives.Value--;
-        Debug.Log($"Player {Owner.ClientId} took damage! Lives: {lives.Value}");
-
-        if (lives.Value <= 0)
-        {
-            Die();
-        }
+        if (lives.Value <= 0) Die();
     }
 
     private void Die()
     {
-        Debug.Log($"Player {Owner.ClientId} died! GAME OVER! Final Score: {score.Value}");
-
         isDead.Value = true;
-
-        // Submit auf dem Owner-Client via TargetRpc
-        if (IsServerInitialized)
-        {
-            SubmitScoreTargetRpc(Owner, score.Value);
-        }
-
+        if (IsServerInitialized) SubmitScoreTargetRpc(Owner, score.Value);
         DisablePlayerObserversRpc();
-
-        OwnNetworkGameManager gameManager = FindFirstObjectByType<OwnNetworkGameManager>();
-        if (gameManager != null)
-        {
-            gameManager.OnPlayerDied(Owner.ClientId);
-        }
+        OwnNetworkGameManager.Instance.OnPlayerDied(Owner.ClientId);
     }
 
     [TargetRpc]
-    private void SubmitScoreTargetRpc(NetworkConnection conn, int finalScore)
+    private void SubmitScoreTargetRpc(FishNet.Connection.NetworkConnection conn, int finalScore)
     {
-        if (HighscoreClient.Instance != null)
-        {
-            string playerName = OwnNetworkGameManager.Instance.Player1.Value;
-            if (Owner.ClientId == 1)
-                playerName = OwnNetworkGameManager.Instance.Player2.Value;
-
-            if (string.IsNullOrEmpty(playerName))
-            {
-                playerName = $"Player{Owner.ClientId}";
-            }
-
-            Debug.Log($"Submitting score: Name={playerName}, Score={finalScore}");
-            HighscoreClient.Instance.SubmitScore(playerName, finalScore);
-
-            // Zeige Highscore-Liste nach 1 Sekunde
-            Invoke(nameof(ShowHighscoreList), 1f);
-        }
+        string playerName = Owner.ClientId == 0 ? OwnNetworkGameManager.Instance.Player1.Value : OwnNetworkGameManager.Instance.Player2.Value;
+        if (string.IsNullOrEmpty(playerName)) playerName = $"Player{Owner.ClientId}";
+        HighscoreClient.Instance?.SubmitScore(playerName, finalScore);
+        Invoke(nameof(ShowHighscoreList), 1f);
     }
 
-    private void ShowHighscoreList()
-    {
-        HighscoreDisplay display = FindFirstObjectByType<HighscoreDisplay>();
-        if (display != null)
-        {
-            display.ShowHighscores();
-        }
-    }
-
-
-
-
-
+    private void ShowHighscoreList() { FindFirstObjectByType<HighscoreDisplay>()?.ShowHighscores(); }
 
     [ObserversRpc]
-    private void DisablePlayerObserversRpc()
+    private void DisablePlayerObserversRpc() { gameObject.SetActive(false); }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void ActivateShieldServerRpc(float duration)
     {
-        gameObject.SetActive(false);
-        Debug.Log($"Player {Owner.ClientId} completely disabled!");
+        if (isDead.Value) return;
+        hasShield.Value = true;
+        float flickerStartTime = duration - 2f;
+        if (flickerStartTime > 0) StartFlickerObserversRpc(flickerStartTime);
+        Invoke(nameof(DeactivateShield), duration);
+        PlaySoundObserversRpc(2);
     }
 
-    private void OnLivesChanged(int prev, int next, bool asServer)
-    {
-        UpdateLivesUI();
-    }
-
-    private void UpdateLivesUI()
-    {
-        if (!IsOwner) return;
-
-        TMP_Text livesUI = GameObject.Find("LivesText")?.GetComponent<TMP_Text>();
-        if (livesUI != null)
-        {
-            if (lives.Value <= 0)
-            {
-                livesUI.text = "GAME OVER";
-                livesUI.color = Color.red;
-            }
-            else
-            {
-                livesUI.text = $"Lives: {lives.Value}";
-                livesUI.color = Color.white;
-            }
-        }
-    }
+    private void DeactivateShield() { hasShield.Value = false; }
 
     public void AddScore(int points)
     {
         if (!IsServerInitialized) return;
         score.Value += points;
-        Debug.Log($"Player {Owner.ClientId} score: {score.Value}");
-
-        // Lade Ultimate Meter auf
-        ChargeUltimate(ultimateChargePerKill);
-
-        // Check für eigenes PowerUp
+        // Ultimate laden (durch Punkte)
+        if (!ultimateActive) ultimateMeter.Value = Mathf.Clamp(ultimateMeter.Value + points, 0f, 100f);
+        // Schild alle X Punkte (separat pro Player)
         if (score.Value >= lastPowerUpScore + powerUpScoreInterval)
         {
             lastPowerUpScore = score.Value;
-            SpawnPowerUpForMe();
+            EnemySpawner.Instance?.SpawnPowerUpNow();
         }
     }
+    #endregion
 
-
-    private void SpawnPowerUpForMe()
+    #region UI & Visuals
+    private void OnLivesChanged(int prev, int next, bool asServer) { UpdateLivesUI(); }
+    private void UpdateLivesUI()
     {
-        EnemySpawner spawner = FindFirstObjectByType<EnemySpawner>();
-        if (spawner != null)
+        if (!IsOwner) return;
+        TMP_Text livesUI = GameObject.Find("LivesText")?.GetComponent<TMP_Text>();
+        if (livesUI != null)
         {
-            spawner.SpawnPowerUpNow();
-            Debug.Log($"Player {Owner.ClientId} spawned PowerUp at score {score.Value}!");
+            livesUI.text = lives.Value <= 0 ? "GAME OVER" : $"Lives: {lives.Value}";
+            livesUI.color = lives.Value <= 0 ? Color.red : Color.white;
         }
     }
 
-
-    private void OnScoreChanged(int prev, int next, bool asServer)
-    {
-        UpdateScoreUI();
-    }
-
+    private void OnScoreChanged(int prev, int next, bool asServer) { UpdateScoreUI(); }
     private void UpdateScoreUI()
     {
         if (!IsOwner) return;
-
         TMP_Text scoreUI = GameObject.Find("ScoreText")?.GetComponent<TMP_Text>();
-        if (scoreUI != null)
-        {
-            scoreUI.text = $"Score: {score.Value}";
-        }
-    }
-    #endregion
-
-    #region ColorChange
-    private void CheckForChangeColor()
-    {
-        if (!colorChangeAction.triggered) return;
-
-        float r = Random.value;
-        float g = Random.value;
-        float b = Random.value;
-        ChangeColor(r, g, b);
+        if (scoreUI != null) scoreUI.text = $"Score: {score.Value}";
     }
 
-    [ServerRpc]
-    private void ChangeColor(float r, float g, float b)
-    {
-        playerColor.Value = new Color(r, g, b);
-    }
-
-    private void OnColorChanged(Color prevColor, Color newColor, bool asServer)
-    {
-        playerRenderer.material.color = newColor;
-    }
-    #endregion
-    #region Ultimate
-    private Coroutine blinkCoroutine = null;
-
-    public void ChargeUltimate(float amount)
-    {
-        if (!IsServerInitialized) return;
-
-        // Nicht aufladen während Ultimate aktiv!
-        if (ultimateActive) return;
-
-        ultimateMeter.Value = Mathf.Clamp(ultimateMeter.Value + amount, 0f, 100f);
-        Debug.Log($"Player {Owner.ClientId} ultimate charged: {ultimateMeter.Value}%");
-    }
-
-    [ServerRpc]
-    private void DrainUltimateServerRpc(float amount)
-    {
-        ultimateMeter.Value = Mathf.Max(0f, ultimateMeter.Value - amount);
-    }
-
+    [ServerRpc] private void DrainUltimateServerRpc(float amount) { ultimateMeter.Value = Mathf.Max(0f, ultimateMeter.Value - amount); }
     private void OnUltimateChanged(float prev, float next, bool asServer)
     {
         UpdateUltimateUI();
-
-        // Blinken nur für Owner
         if (!IsOwner) return;
-
-        // Starte Blinken bei 100%
-        if (next >= 100f && blinkCoroutine == null)
-        {
-            blinkCoroutine = StartCoroutine(BlinkUltimateSlider());
-        }
-        // Stoppe Blinken wenn unter 100%
-        else if (next < 100f && blinkCoroutine != null)
-        {
-            StopCoroutine(blinkCoroutine);
-            blinkCoroutine = null;
-
-            // Setze Farbe zurück
-            UnityEngine.UI.Slider slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
-            if (slider != null)
-            {
-                UnityEngine.UI.Image fillImage = slider.fillRect?.GetComponent<UnityEngine.UI.Image>();
-                if (fillImage != null)
-                {
-                    fillImage.color = Color.yellow;
-                }
-            }
-        }
+        if (next >= 100f && blinkCoroutine == null) blinkCoroutine = StartCoroutine(BlinkUltimateSlider());
+        else if (next < 100f && blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; ResetSliderColor(); }
     }
-
     private void UpdateUltimateUI()
     {
         if (!IsOwner) return;
-
-        UnityEngine.UI.Slider ultimateUI = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
-        if (ultimateUI != null)
-        {
-            ultimateUI.value = ultimateMeter.Value;
-        }
+        var slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
+        if (slider != null) slider.value = ultimateMeter.Value;
     }
-
+    private void ResetSliderColor()
+    {
+        var slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
+        var img = slider?.fillRect.GetComponent<UnityEngine.UI.Image>();
+        if (img != null) img.color = Color.yellow;
+    }
     private IEnumerator BlinkUltimateSlider()
     {
-        UnityEngine.UI.Slider slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
-        if (slider == null) yield break;
+        var slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
+        var img = slider?.fillRect.GetComponent<UnityEngine.UI.Image>();
+        while (img != null) { img.color = Color.yellow; yield return new WaitForSeconds(0.3f); img.color = Color.red; yield return new WaitForSeconds(0.3f); }
+    }
 
-        UnityEngine.UI.Image fillImage = slider.fillRect?.GetComponent<UnityEngine.UI.Image>();
-        if (fillImage == null) yield break;
+    private void OnShieldChanged(bool prev, bool next, bool asServer) { shieldVisual?.SetActive(next); }
+    private void CreateShieldVisual()
+    {
+        shieldVisual = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        shieldVisual.transform.SetParent(transform);
+        shieldVisual.transform.localPosition = Vector3.zero;
+        shieldVisual.transform.localScale = Vector3.one * 1.5f;
+        Destroy(shieldVisual.GetComponent<Collider>());
+        var r = shieldVisual.GetComponent<Renderer>();
+        r.material = new Material(Shader.Find("Sprites/Default"));
+        r.material.color = new Color(0f, 1f, 0f, 0.15f); // Transparenter
+        shieldVisual.SetActive(false);
+    }
+    [ObserversRpc] private void StartFlickerObserversRpc(float delay) { Invoke(nameof(StartFlickerLocal), delay); }
+    private void StartFlickerLocal() { if (shieldVisual != null) StartCoroutine(FlickerShield()); }
+    private IEnumerator FlickerShield() { while (hasShield.Value) { if (shieldVisual != null) shieldVisual.SetActive(!shieldVisual.activeSelf); yield return new WaitForSeconds(0.2f); } if (shieldVisual != null) shieldVisual.SetActive(false); }
 
-        while (true)
-        {
-            fillImage.color = Color.yellow;
-            yield return new WaitForSeconds(0.3f);
-            fillImage.color = Color.red;
-            yield return new WaitForSeconds(0.3f);
-        }
+    [ObserversRpc]
+    private void PlaySoundObserversRpc(int type)
+    {
+        if (SimpleSoundManager.Instance == null) return;
+        if (type == 1) SimpleSoundManager.Instance.PlayLaserSound();
+        else if (type == 2) SimpleSoundManager.Instance.PlayPowerUpSound();
     }
     #endregion
-
-
-
 }
