@@ -2,17 +2,16 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-// Hänge das Skript an dein Canvas oder ein leeres GameObject in der MainMenu- oder GameOver-Scene
 public class LobbySwitch : MonoBehaviour
 {
     [Header("Buttons (Drag hier rein)")]
-    public Button exitButton;
+    public Button LobbyButton;
 
     void Start()
     {
         // Listener für die Buttons setzen
-        if (exitButton != null)
-            exitButton.onClick.AddListener(NewGame);
+        if (LobbyButton != null)
+            LobbyButton.onClick.AddListener(NewGame);
     }
 
     // "New Game" / Restart: Einfach die Game-Scene laden
