@@ -7,7 +7,6 @@ using UnityEngine.InputSystem;
 
 public class OwnPlayerController : NetworkBehaviour
 {
-    [Header("SyncVars")]
     private readonly SyncVar<Color> playerColor = new SyncVar<Color>();
     private readonly SyncVar<bool> isReady = new SyncVar<bool>();
     public bool IsReady => isReady.Value;
@@ -36,11 +35,10 @@ public class OwnPlayerController : NetworkBehaviour
     [Header("Input System")]
     [SerializeField] private InputAction moveAction;
     [SerializeField] private InputAction colorChangeAction;
-    [SerializeField] private InputAction readyAction; // Falls du R nutzen willst
 
     [Header("Shooting")]
-    [SerializeField] private InputAction shootSingleAction; // Linke Maus
-    [SerializeField] private InputAction shootSpreadAction; // Rechte Maus
+    [SerializeField] private InputAction shootSingleAction;
+    [SerializeField] private InputAction shootSpreadAction;
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private Transform firePoint;
     [SerializeField] private float fireRate = 0.2f;
@@ -54,7 +52,6 @@ public class OwnPlayerController : NetworkBehaviour
     private GameObject shieldVisual;
     private PlayerInput _playerInput;
 
-    #region Inits & Network
     public override void OnStartNetwork()
     {
         base.OnStartNetwork();
@@ -63,7 +60,6 @@ public class OwnPlayerController : NetworkBehaviour
         hasShield.OnChange += OnShieldChanged;
         ultimateMeter.OnChange += OnUltimateChanged;
         playerColor.OnChange += OnColorChanged;
-
         UpdateLivesUI();
         UpdateScoreUI();
         UpdateUltimateUI();
@@ -87,8 +83,7 @@ public class OwnPlayerController : NetworkBehaviour
         colorChangeAction?.Disable();
         shootSingleAction?.Disable();
         shootSpreadAction?.Disable();
-        if (TimeManager != null)
-            TimeManager.OnTick -= OnTick;
+        if (TimeManager != null) TimeManager.OnTick -= OnTick;
     }
 
     private void Start()
@@ -100,18 +95,9 @@ public class OwnPlayerController : NetworkBehaviour
     private IEnumerator DelayedIsOwner()
     {
         playerRenderer = GetComponentInChildren<Renderer>();
-        if (playerRenderer != null)
-        {
-            playerRenderer.material = new Material(playerRenderer.material);
-            playerRenderer.material.color = playerColor.Value;
-        }
-
+        if (playerRenderer != null) { playerRenderer.material = new Material(playerRenderer.material); playerRenderer.material.color = playerColor.Value; }
         var pi = GetComponent<PlayerInput>();
-        if (playerIndexText != null && pi != null)
-        {
-            playerIndexText.text = $"Player {pi.playerIndex}";
-        }
-
+        if (playerIndexText != null && pi != null) playerIndexText.text = $"Player {pi.playerIndex}";
         yield return null;
         if (IsOwner)
         {
@@ -120,62 +106,32 @@ public class OwnPlayerController : NetworkBehaviour
             colorChangeAction?.Enable();
             shootSingleAction?.Enable();
             shootSpreadAction?.Enable();
-            if (TimeManager != null)
-                TimeManager.OnTick += OnTick;
-
+            if (TimeManager != null) TimeManager.OnTick += OnTick;
             UpdateLivesUI();
             UpdateScoreUI();
             UpdateUltimateUI();
         }
     }
-    #endregion
 
     private void OnTick()
     {
         if (!IsOwner) return;
-
-        if (isReady.Value)
-        {
-            HandleInput();
-            HandleShooting();
-        }
-        else
-        {
-            CheckForChangeColor();
-        }
+        if (isReady.Value) { HandleInput(); HandleShooting(); }
+        else CheckForChangeColor();
     }
 
-    #region Ready & Color
     [ServerRpc]
     public void SetReadyStateServerRpc(string name)
     {
         isReady.Value = !isReady.Value;
         if (transform.position.x < 0) OwnNetworkGameManager.Instance.Player1.Value = name;
         else OwnNetworkGameManager.Instance.Player2.Value = name;
-
         OwnNetworkGameManager.Instance.CheckAndStartGame();
         OwnNetworkGameManager.Instance.RpcUpdateReadyButtonText(isReady.Value);
     }
 
-    [ServerRpc]
-    public void CmdSetReady(bool ready) { isReady.Value = ready; }
+    [ServerRpc] public void CmdSetReady(bool ready) { isReady.Value = ready; }
 
-    private void CheckForChangeColor()
-    {
-        if (colorChangeAction == null || !colorChangeAction.triggered) return;
-        ChangeColorServerRpc(Random.value, Random.value, Random.value);
-    }
-
-    [ServerRpc]
-    private void ChangeColorServerRpc(float r, float g, float b) { playerColor.Value = new Color(r, g, b); }
-
-    private void OnColorChanged(Color prev, Color next, bool asServer)
-    {
-        if (playerRenderer != null) playerRenderer.material.color = next;
-    }
-    #endregion
-
-    #region Movement
     [ServerRpc]
     private void MoveServerRpc(Vector2 input)
     {
@@ -190,15 +146,11 @@ public class OwnPlayerController : NetworkBehaviour
         Vector2 input = moveAction.ReadValue<Vector2>();
         if (input.sqrMagnitude > 0f) MoveServerRpc(input);
     }
-    #endregion
 
-    #region Shooting
     private void HandleShooting()
     {
         bool isSinglePressed = shootSingleAction.IsPressed();
         bool isSpreadPressed = shootSpreadAction.IsPressed();
-
-        // Ultimate Mode (Linke Maus halten bei 100%)
         if (ultimateActive)
         {
             if (isSinglePressed) ShootServerRpc(1);
@@ -206,26 +158,10 @@ public class OwnPlayerController : NetworkBehaviour
             if (ultimateMeter.Value <= 0f) ultimateActive = false;
             return;
         }
-
-        if (isSinglePressed && ultimateMeter.Value >= 100f && !ultimateActive)
-        {
-            ultimateActive = true;
-            return;
-        }
-
-        // Normaler Schuss
-        if (isSinglePressed && !wasSinglePressed && Time.time >= nextFireTime)
-        {
-            ShootServerRpc(1);
-            nextFireTime = Time.time + fireRate;
-        }
+        if (isSinglePressed && ultimateMeter.Value >= 100f && !ultimateActive) { ultimateActive = true; return; }
+        if (isSinglePressed && !wasSinglePressed && Time.time >= nextFireTime) { ShootServerRpc(1); nextFireTime = Time.time + fireRate; }
         wasSinglePressed = isSinglePressed;
-
-        if (isSpreadPressed && !wasSpreadPressed && Time.time >= nextFireTime)
-        {
-            ShootServerRpc(2);
-            nextFireTime = Time.time + fireRate;
-        }
+        if (isSpreadPressed && !wasSpreadPressed && Time.time >= nextFireTime) { ShootServerRpc(2); nextFireTime = Time.time + fireRate; }
         wasSpreadPressed = isSpreadPressed;
     }
 
@@ -234,11 +170,9 @@ public class OwnPlayerController : NetworkBehaviour
     {
         Vector3 spawnPos = firePoint ? firePoint.position : transform.position;
         Vector2 baseDirection = Vector2.up;
-
         if (pattern == 1) SpawnBullet(spawnPos, baseDirection);
         else if (pattern == 2)
         {
-            // Deine Fächer-Werte (30 und -30)
             SpawnBullet(spawnPos + new Vector3(-0.4f, 0, 0), Rotate(baseDirection, 30f));
             SpawnBullet(spawnPos, baseDirection);
             SpawnBullet(spawnPos + new Vector3(0.4f, 0, 0), Rotate(baseDirection, -30f));
@@ -261,9 +195,7 @@ public class OwnPlayerController : NetworkBehaviour
         float cos = Mathf.Cos(radians);
         return new Vector2(v.x * cos - v.y * sin, v.x * sin + v.y * cos);
     }
-    #endregion
 
-    #region Health, Shield & Score
     [ServerRpc(RequireOwnership = false)]
     public void TakeDamageServerRpc()
     {
@@ -275,6 +207,7 @@ public class OwnPlayerController : NetworkBehaviour
     private void Die()
     {
         isDead.Value = true;
+        PlaySoundObserversRpc(3);
         if (IsServerInitialized) SubmitScoreTargetRpc(Owner, score.Value);
         DisablePlayerObserversRpc();
         OwnNetworkGameManager.Instance.OnPlayerDied(Owner.ClientId);
@@ -291,8 +224,7 @@ public class OwnPlayerController : NetworkBehaviour
 
     private void ShowHighscoreList() { FindFirstObjectByType<HighscoreDisplay>()?.ShowHighscores(); }
 
-    [ObserversRpc]
-    private void DisablePlayerObserversRpc() { gameObject.SetActive(false); }
+    [ObserversRpc] private void DisablePlayerObserversRpc() { gameObject.SetActive(false); }
 
     [ServerRpc(RequireOwnership = false)]
     public void ActivateShieldServerRpc(float duration)
@@ -307,22 +239,15 @@ public class OwnPlayerController : NetworkBehaviour
 
     private void DeactivateShield() { hasShield.Value = false; }
 
-    public void AddScore(int points)
+    [ObserversRpc]
+    private void PlaySoundObserversRpc(int type)
     {
-        if (!IsServerInitialized) return;
-        score.Value += points;
-        // Ultimate laden (durch Punkte)
-        if (!ultimateActive) ultimateMeter.Value = Mathf.Clamp(ultimateMeter.Value + points, 0f, 100f);
-        // Schild alle X Punkte (separat pro Player)
-        if (score.Value >= lastPowerUpScore + powerUpScoreInterval)
-        {
-            lastPowerUpScore = score.Value;
-            EnemySpawner.Instance?.SpawnPowerUpNow();
-        }
+        if (SimpleSoundManager.Instance == null) return;
+        if (type == 1) SimpleSoundManager.Instance.PlayLaserSound();
+        else if (type == 2) SimpleSoundManager.Instance.PlayPowerUpSound();
+        else if (type == 3) SimpleSoundManager.Instance.PlayPlayerDeathSound();
     }
-    #endregion
 
-    #region UI & Visuals
     private void OnLivesChanged(int prev, int next, bool asServer) { UpdateLivesUI(); }
     private void UpdateLivesUI()
     {
@@ -333,6 +258,14 @@ public class OwnPlayerController : NetworkBehaviour
             livesUI.text = lives.Value <= 0 ? "GAME OVER" : $"Lives: {lives.Value}";
             livesUI.color = lives.Value <= 0 ? Color.red : Color.white;
         }
+    }
+
+    public void AddScore(int points)
+    {
+        if (!IsServerInitialized) return;
+        score.Value += points;
+        if (!ultimateActive) ultimateMeter.Value = Mathf.Clamp(ultimateMeter.Value + points, 0f, 100f);
+        if (score.Value >= lastPowerUpScore + powerUpScoreInterval) { lastPowerUpScore = score.Value; EnemySpawner.Instance?.SpawnPowerUpNow(); }
     }
 
     private void OnScoreChanged(int prev, int next, bool asServer) { UpdateScoreUI(); }
@@ -348,6 +281,7 @@ public class OwnPlayerController : NetworkBehaviour
     {
         UpdateUltimateUI();
         if (!IsOwner) return;
+        SimpleSoundManager.Instance?.SetUltimateLoop(next >= 100f);
         if (next >= 100f && blinkCoroutine == null) blinkCoroutine = StartCoroutine(BlinkUltimateSlider());
         else if (next < 100f && blinkCoroutine != null) { StopCoroutine(blinkCoroutine); blinkCoroutine = null; ResetSliderColor(); }
     }
@@ -357,12 +291,7 @@ public class OwnPlayerController : NetworkBehaviour
         var slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
         if (slider != null) slider.value = ultimateMeter.Value;
     }
-    private void ResetSliderColor()
-    {
-        var slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
-        var img = slider?.fillRect.GetComponent<UnityEngine.UI.Image>();
-        if (img != null) img.color = Color.yellow;
-    }
+    private void ResetSliderColor() { var slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>(); var img = slider?.fillRect.GetComponent<UnityEngine.UI.Image>(); if (img != null) img.color = Color.yellow; }
     private IEnumerator BlinkUltimateSlider()
     {
         var slider = GameObject.Find("UltimateSlider")?.GetComponent<UnityEngine.UI.Slider>();
@@ -380,19 +309,18 @@ public class OwnPlayerController : NetworkBehaviour
         Destroy(shieldVisual.GetComponent<Collider>());
         var r = shieldVisual.GetComponent<Renderer>();
         r.material = new Material(Shader.Find("Sprites/Default"));
-        r.material.color = new Color(0f, 1f, 0f, 0.15f); // Transparenter
+        r.material.color = new Color(0f, 1f, 0f, 0.15f);
         shieldVisual.SetActive(false);
     }
     [ObserversRpc] private void StartFlickerObserversRpc(float delay) { Invoke(nameof(StartFlickerLocal), delay); }
-    private void StartFlickerLocal() { if (shieldVisual != null) StartCoroutine(FlickerShield()); }
+    private void StartFlickerLocal() { if (shieldVisual != null) { StartCoroutine(FlickerShield()); SimpleSoundManager.Instance?.PlayShieldWarningSound(); } }
     private IEnumerator FlickerShield() { while (hasShield.Value) { if (shieldVisual != null) shieldVisual.SetActive(!shieldVisual.activeSelf); yield return new WaitForSeconds(0.2f); } if (shieldVisual != null) shieldVisual.SetActive(false); }
 
-    [ObserversRpc]
-    private void PlaySoundObserversRpc(int type)
+    private void CheckForChangeColor()
     {
-        if (SimpleSoundManager.Instance == null) return;
-        if (type == 1) SimpleSoundManager.Instance.PlayLaserSound();
-        else if (type == 2) SimpleSoundManager.Instance.PlayPowerUpSound();
+        if (colorChangeAction == null || !colorChangeAction.triggered) return;
+        ChangeColorServerRpc(Random.value, Random.value, Random.value);
     }
-    #endregion
+    [ServerRpc] private void ChangeColorServerRpc(float r, float g, float b) { playerColor.Value = new Color(r, g, b); }
+    private void OnColorChanged(Color prev, Color next, bool asServer) { if (playerRenderer != null) playerRenderer.material.color = next; }
 }

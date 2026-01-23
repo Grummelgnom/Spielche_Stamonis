@@ -3,8 +3,8 @@ using UnityEngine;
 public class SimpleSoundManager : MonoBehaviour
 {
     public static SimpleSoundManager Instance { get; private set; }
-
     private AudioSource audioSource;
+    private AudioSource loopingSource;
 
     private void Awake()
     {
@@ -12,54 +12,47 @@ public class SimpleSoundManager : MonoBehaviour
         {
             Instance = this;
             audioSource = gameObject.AddComponent<AudioSource>();
+            loopingSource = gameObject.AddComponent<AudioSource>();
+            loopingSource.loop = true;
             DontDestroyOnLoad(gameObject);
         }
-        else
+        else { Destroy(gameObject); }
+    }
+
+    public void PlayLaserSound() { PlayTone(440f, 0.1f, 0.1f, true); }
+    public void PlayPowerUpSound() { PlayTone(600f, 0.2f, 0.2f, true, true); }
+    public void PlayExplosionSound() { PlayTone(80f, 0.25f, 0.3f, false); }
+    public void PlayPlayerDeathSound() { PlayTone(200f, 0.8f, 0.4f, true, false); }
+    public void PlayShieldWarningSound() { PlayTone(880f, 0.15f, 0.2f, false); }
+
+    public void SetUltimateLoop(bool active)
+    {
+        if (active && !loopingSource.isPlaying)
         {
-            Destroy(gameObject);
+            loopingSource.clip = CreateToneClip(150f, 0.5f, 0.1f, false);
+            loopingSource.Play();
         }
-    }
-
-    // Erzeugt einen "Laser"-Schuss-Sound
-    public void PlayLaserSound()
-    {
-        PlayTone(440f, 0.1f, 0.2f, true); // Von Hoch nach Tief
-    }
-
-    // Erzeugt einen "Explosion"-Sound
-    public void PlayExplosionSound()
-    {
-        PlayTone(100f, 0.3f, 0.5f, false); // Tiefer Brummton
-    }
-
-    // Erzeugt einen "PowerUp"-Sound
-    public void PlayPowerUpSound()
-    {
-        PlayTone(600f, 0.2f, 0.3f, true, true); // Ansteigend
+        else if (!active) { loopingSource.Stop(); }
     }
 
     private void PlayTone(float freq, float duration, float volume, bool sweep, bool up = false)
     {
+        audioSource.PlayOneShot(CreateToneClip(freq, duration, volume, sweep, up));
+    }
+
+    private AudioClip CreateToneClip(float freq, float duration, float volume, bool sweep, bool up = false)
+    {
         int sampleRate = 44100;
         int sampleCount = (int)(sampleRate * duration);
         float[] samples = new float[sampleCount];
-
         for (int i = 0; i < sampleCount; i++)
         {
             float t = (float)i / sampleRate;
-            float currentFreq = freq;
-
-            if (sweep)
-            {
-                if (up) currentFreq = freq + (i * 0.05f);
-                else currentFreq = freq - (i * 0.05f);
-            }
-
+            float currentFreq = sweep ? (up ? freq + (i * 0.05f) : freq - (i * 0.05f)) : freq;
             samples[i] = Mathf.Sin(2 * Mathf.PI * currentFreq * t) * volume * (1f - (float)i / sampleCount);
         }
-
-        AudioClip clip = AudioClip.Create("GeneratedTone", sampleCount, 1, sampleRate, false);
+        AudioClip clip = AudioClip.Create("GenTone", sampleCount, 1, sampleRate, false);
         clip.SetData(samples, 0);
-        audioSource.PlayOneShot(clip);
+        return clip;
     }
 }
