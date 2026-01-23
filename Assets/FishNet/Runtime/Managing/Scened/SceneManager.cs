@@ -2547,6 +2547,11 @@ namespace FishNet.Managing.Scened
 
             return result;
         }
+
+        public void LoadScene(string sceneName)
+        {
+            throw new NotImplementedException();
+        }
         #endregion
     }
 }
