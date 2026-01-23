@@ -127,7 +127,7 @@ public class OwnPlayerController : NetworkBehaviour
         if (transform.position.x < 0) OwnNetworkGameManager.Instance.Player1.Value = name;
         else OwnNetworkGameManager.Instance.Player2.Value = name;
         OwnNetworkGameManager.Instance.CheckAndStartGame();
-        OwnNetworkGameManager.Instance.RpcUpdateReadyButtonText(isReady.Value);
+        
     }
 
     [ServerRpc] public void CmdSetReady(bool ready) { isReady.Value = ready; }
