@@ -1,15 +1,16 @@
-using FishNet.Object;
+﻿using FishNet.Object;
 using UnityEngine;
 
 public class ShieldPowerUpController : NetworkBehaviour
 {
-    [SerializeField] private float fallSpeed = 2f;
-    [SerializeField] private float shieldDuration = 5f;
+    [SerializeField] private float fallSpeed = 2f;        // Fallgeschwindigkeit des PowerUps
+    [SerializeField] private float shieldDuration = 5f;   // Dauer des Shields nach Pickup
 
     private Rigidbody2D rb;
 
     private void Start()
     {
+        // Rigidbody initialisieren und Fallgeschwindigkeit setzen
         rb = GetComponent<Rigidbody2D>();
         if (rb != null)
         {
@@ -19,9 +20,11 @@ public class ShieldPowerUpController : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsServerInitialized) return;
+        // Nur Server entscheidet über Despawn
+        if (!IsServerInitialized)
+            return;
 
-        // Despawn wenn zu weit unten
+        // Wenn PowerUp aus dem Bildschirm ist → despawnen
         if (transform.position.y < -6f)
         {
             ServerManager.Despawn(gameObject);
@@ -30,16 +33,17 @@ public class ShieldPowerUpController : NetworkBehaviour
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (!IsServerInitialized) return;
+        // Kollisionen nur serverseitig auswerten
+        if (!IsServerInitialized)
+            return;
 
+        // Spieler prüfen
         OwnPlayerController player = collision.GetComponent<OwnPlayerController>();
         if (player != null && !player.isDead.Value)
         {
-            Debug.Log($"PowerUp: Player {player.Owner.ClientId} picked up Shield! Calling ActivateShieldServerRpc...");
+            // Shield aktivieren und PowerUp despawnen
             player.ActivateShieldServerRpc(shieldDuration);
-            Debug.Log($"PowerUp: ActivateShieldServerRpc called! Despawning PowerUp...");
             ServerManager.Despawn(gameObject);
         }
     }
-
 }

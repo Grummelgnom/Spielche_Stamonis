@@ -6,41 +6,70 @@ using UnityEngine.Networking;
 
 public class HighscoreClient : MonoBehaviour
 {
+    // Singleton für globalen Zugriff
     public static HighscoreClient Instance { get; private set; }
 
     [Header("API Base URL")]
-    [SerializeField] private string baseUrl = "http://localhost/bullethell_api";
+    [SerializeField] private string baseUrl = "http://localhost/bullethell_api";  // Backend-API Basis-URL
 
     private void Awake()
     {
+        // Singleton-Setup
         if (Instance == null)
             Instance = this;
         else
             Destroy(gameObject);
     }
 
+    // JSON-Daten für Score-Submit
     [Serializable]
-    private class SubmitRequest { public string player_name; public int score; }
+    private class SubmitRequest
+    {
+        public string player_name;
+        public int score;
+    }
 
+    // Response bei Score-Submit
     [Serializable]
-    private class SubmitResponse { public bool ok; public int id; public string error; }
+    private class SubmitResponse
+    {
+        public bool ok;
+        public int id;
+        public string error;
+    }
 
+    // Einzelner Highscore-Eintrag
     [Serializable]
-    public class HighscoreEntry { public int id; public string player_name; public int score; public string created_at; }
+    public class HighscoreEntry
+    {
+        public int id;
+        public string player_name;
+        public int score;
+        public string created_at;
+    }
 
+    // Response bei Highscore-Request
     [Serializable]
-    private class GetResponse { public bool ok; public HighscoreEntry[] highscores; public string error; }
+    private class GetResponse
+    {
+        public bool ok;
+        public HighscoreEntry[] highscores;
+        public string error;
+    }
 
+    // Score an Server senden
     public void SubmitScore(string playerName, int score)
     {
         StartCoroutine(SubmitScoreCoroutine(playerName, score));
     }
 
+    // Highscores vom Server holen
     public void FetchHighscores(Action<HighscoreEntry[]> onResult)
     {
         StartCoroutine(GetHighscoresCoroutine(onResult));
     }
 
+    // Coroutine: Score-Submit (POST /submit_score.php)
     private IEnumerator SubmitScoreCoroutine(string playerName, int score)
     {
         var url = $"{baseUrl}/submit_score.php";
@@ -57,22 +86,16 @@ public class HighscoreClient : MonoBehaviour
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError($"Submit score failed: {req.error}");
             yield break;
-        }
 
         var res = JsonUtility.FromJson<SubmitResponse>(req.downloadHandler.text);
         if (res != null && res.ok)
         {
-            Debug.Log($"Score submitted! Name: {playerName}, Score: {score}, ID: {res.id}");
-        }
-        else
-        {
-            Debug.LogError($"Submit score error: {(res != null ? res.error : "Invalid response")}");
+            // Score erfolgreich gespeichert
         }
     }
 
+    // Coroutine: Highscores abrufen (GET /get_highscores.php)
     private IEnumerator GetHighscoresCoroutine(Action<HighscoreEntry[]> onResult)
     {
         var url = $"{baseUrl}/get_highscores.php";
@@ -82,7 +105,6 @@ public class HighscoreClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError($"Get highscores failed: {req.error}");
             onResult?.Invoke(Array.Empty<HighscoreEntry>());
             yield break;
         }
@@ -90,12 +112,10 @@ public class HighscoreClient : MonoBehaviour
         var res = JsonUtility.FromJson<GetResponse>(req.downloadHandler.text);
         if (res != null && res.ok)
         {
-            Debug.Log($"Fetched {res.highscores.Length} highscores");
             onResult?.Invoke(res.highscores);
         }
         else
         {
-            Debug.LogError($"Get highscores error: {(res != null ? res.error : "Invalid response")}");
             onResult?.Invoke(Array.Empty<HighscoreEntry>());
         }
     }

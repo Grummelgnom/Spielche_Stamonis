@@ -1,54 +1,45 @@
 ﻿using UnityEngine;
 using TMPro;
 using System.Text;
-using UnityEngine.UI;  // Für den Button
-using FishNet.Managing.Scened;  // Für FishnetSceneLoader
+using UnityEngine.UI;
+using FishNet.Managing.Scened;
+
 public class HighscoreDisplay : MonoBehaviour
 {
-    [SerializeField] private GameObject highscorePanel;
-    [SerializeField] private TextMeshProUGUI highscoreListText;
+    [SerializeField] private GameObject highscorePanel;              // Panel mit Highscore-Liste
+    [SerializeField] private TextMeshProUGUI highscoreListText;      // Text-Komponente für Scores
 
-    // ────────────────────────────────────────────────
-    // NEU: Button und Ziel-Szene (im Inspector zuweisbar)
-    // ────────────────────────────────────────────────
     [Header("Zurück-Button")]
-    [SerializeField] private Button backToMenuButton;
+    [SerializeField] private Button backToMenuButton;                // Button zum Zurück ins Menü
 
     [Header("Ziel-Szene nach Klick")]
-    [SerializeField] private string targetSceneName = "MainMenu";  // Im Inspector änderbar
+    [SerializeField] private string targetSceneName = "MainMenu";    // Szene zum Laden (Inspector)
 
     private void Awake()
     {
-        // Sicherstellen, dass alles anfangs unsichtbar ist
+        // Initial UI verstecken
         if (highscorePanel != null)
             highscorePanel.SetActive(false);
 
         if (backToMenuButton != null)
         {
             backToMenuButton.gameObject.SetActive(false);
-
-            // Listener einmalig hinzufügen
+            // Button-Listener konfigurieren
             backToMenuButton.onClick.RemoveAllListeners();
             backToMenuButton.onClick.AddListener(OnBackButtonClicked);
         }
-        else
-        {
-            Debug.LogWarning("BackToMenuButton nicht im Inspector zugewiesen!");
-        }
     }
 
+    // Highscores anzeigen (wird von Spiel-Manager aufgerufen)
     public void ShowHighscores()
     {
         if (HighscoreClient.Instance != null)
         {
             HighscoreClient.Instance.FetchHighscores(OnHighscoresReceived);
         }
-        else
-        {
-            Debug.LogError("HighscoreClient.Instance is NULL!");
-        }
     }
 
+    // Callback: Highscores empfangen und anzeigen
     private void OnHighscoresReceived(HighscoreClient.HighscoreEntry[] scores)
     {
         if (highscorePanel != null)
@@ -63,48 +54,40 @@ public class HighscoreDisplay : MonoBehaviour
         }
         else
         {
+            // Top 10 anzeigen
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < scores.Length && i < 10; i++)
             {
                 sb.AppendLine($"{i + 1}. {scores[i].player_name} - {scores[i].score}");
             }
             highscoreListText.text = sb.ToString();
-            Debug.Log($"Displayed {scores.Length} highscores");
         }
 
-        // NEU: Button sichtbar machen, sobald Highscores geladen sind
+        // Zurück-Button anzeigen
         if (backToMenuButton != null)
             backToMenuButton.gameObject.SetActive(true);
     }
 
+    // Highscore-Panel verstecken
     public void HideHighscores()
     {
         if (highscorePanel != null)
             highscorePanel.SetActive(false);
 
-        // Optional: Button wieder ausblenden
         if (backToMenuButton != null)
             backToMenuButton.gameObject.SetActive(false);
     }
 
-    // NEU: Button-Klick → Szene laden
+    // Button-Event: Zurück ins Menü (lädt Szene)
     public void OnBackButtonClicked()
     {
-        Debug.Log("[Button] Klick erkannt – Zielszene: " + targetSceneName);
-
         if (FishNetSceneLoader.Instance == null)
-        {
-            Debug.LogError("[Button] FishNetSceneLoader.Instance ist null!");
             return;
-        }
 
-        Debug.Log("[Button] Loader gefunden – setze sceneName auf: " + targetSceneName);
+        // Zielszene setzen und laden
         FishNetSceneLoader.Instance.sceneName = targetSceneName;
-
-        Debug.Log("[Button] Rufe LoadSceneButton() auf");
         FishNetSceneLoader.Instance.LoadSceneButton();
 
-        Debug.Log("[Button] Aufruf abgeschlossen – Panel wird geschlossen");
         HideHighscores();
     }
 }

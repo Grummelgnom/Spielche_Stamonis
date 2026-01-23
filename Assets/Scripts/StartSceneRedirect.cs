@@ -1,23 +1,18 @@
-﻿using FishNet.Managing; // Add this to access NetworkManager
+﻿using FishNet.Managing;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public class StartSceneRedirect : MonoBehaviour
 {
-    [Header("Szene, die im normalen Editor-Play zuerst geladen werden soll")]
-    [SerializeField] private string editorStartScene = "MainMenu";  // Im Inspector änderbar
+    [Header("Szene für Editor-Play (kein Netzwerk)")]
+    [SerializeField] private string editorStartScene = "MainMenu";  // Zielszene ohne Netzwerk
 
     private void Awake()
     {
-        // Sofort prüfen
+        // Prüft, ob Netzwerk läuft → leitet zu Editor-Startszene um (Single-Player-Test)
         if (!FishNet.InstanceFinder.NetworkManager.IsOnline)
         {
-            Debug.Log($"[StartRedirect] Kein Netzwerk aktiv (Editor-Play) → Wechsel zu: {editorStartScene}");
             SceneManager.LoadScene(editorStartScene, LoadSceneMode.Single);
-        }
-        else
-        {
-            Debug.Log("[StartRedirect] Netzwerk aktiv (Server/Client/Host) → bleibe in aktueller Szene");
         }
     }
 }

@@ -8,51 +8,52 @@ using UnityEngine.UI;
 
 public class OwnNetworkGameManager : NetworkBehaviour
 {
+    // Singleton für globalen Zugriff
     public static OwnNetworkGameManager Instance { get; private set; }
 
     [Header("UI")]
-    [SerializeField] private TextMeshPro readyButtonText; // 3D-Text, kein UGUI
-    [SerializeField] private TMP_Text stateText;
-    [SerializeField] private TMP_Text player1NameText;    // oben links
-    [SerializeField] private TMP_Text player2NameText;    // oben rechts
-    [SerializeField] private TMP_InputField PlayerNameField;
-    [SerializeField] private Button ReadyButton;
+    [SerializeField] private TextMeshPro readyButtonText;     // 3D-Text für Ready-Button
+    [SerializeField] private TMP_Text stateText;              // Status-Text (Score/Warten)
+    [SerializeField] private TMP_Text player1NameText;        // Name Player 1 (links)
+    [SerializeField] private TMP_Text player2NameText;        // Name Player 2 (rechts)
+    [SerializeField] private TMP_InputField PlayerNameField;  // Eingabefeld für Spielernamen
+    [SerializeField] private Button ReadyButton;              // Ready-Button
 
-    // Diese SyncVars bleiben: Player1 links, Player2 rechts
+    // Synchronisierte Spielernamen (links = Player1, rechts = Player2)
     public readonly SyncVar<string> Player1 = new SyncVar<string>();
     public readonly SyncVar<string> Player2 = new SyncVar<string>();
 
     [Header("Score")]
-    private readonly SyncVar<int> scoreP1 = new SyncVar<int>();
-    private readonly SyncVar<int> scoreP2 = new SyncVar<int>();
+    private readonly SyncVar<int> scoreP1 = new SyncVar<int>();  // Score Player 1
+    private readonly SyncVar<int> scoreP2 = new SyncVar<int>();  // Score Player 2
 
     [Header("Game")]
-    private readonly SyncVar<GameState> gameState = new SyncVar<GameState>();
+    private readonly SyncVar<GameState> gameState = new SyncVar<GameState>();  // Aktueller Spielzustand
     public GameState CurrentState => gameState.Value;
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else { Destroy(gameObject); return; }
+        // Singleton-Setup
+        if (Instance == null)
+            Instance = this;
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
 
+        // Callbacks für UI-Updates registrieren
         gameState.OnChange += OnStateChanged;
         scoreP1.OnChange += (oldVal, newVal, asServer) => UpdateStateText();
         scoreP2.OnChange += (oldVal, newVal, asServer) => UpdateStateText();
-
-        Player1.OnChange += (oldVal, newVal, asServer) =>
-        {
-            ApplyNameToUI(1, newVal);
-        };
-
-        Player2.OnChange += (oldVal, newVal, asServer) =>
-        {
-            ApplyNameToUI(2, newVal);
-        };
+        Player1.OnChange += (oldVal, newVal, asServer) => ApplyNameToUI(1, newVal);
+        Player2.OnChange += (oldVal, newVal, asServer) => ApplyNameToUI(2, newVal);
     }
 
     public override void OnStartServer()
     {
         base.OnStartServer();
+        // Initialwerte setzen
         gameState.Value = GameState.WaitingForPlayers;
         scoreP1.Value = 0;
         scoreP2.Value = 0;
@@ -60,7 +61,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
 
     private void Start()
     {
-        // unverändert …
+        // Initial UI-Setup (Ready-UI verstecken, Namensanzeige zeigen)
         if (PlayerNameField != null)
             PlayerNameField.gameObject.SetActive(false);
         if (ReadyButton != null)
@@ -72,83 +73,66 @@ public class OwnNetworkGameManager : NetworkBehaviour
             player2NameText.gameObject.SetActive(true);
     }
 
-
     public override void OnStartClient()
     {
         base.OnStartClient();
 
-        // Eingabe-UI zeigen
+        // Client-seitig Ready-UI zeigen
         if (PlayerNameField != null)
             PlayerNameField.gameObject.SetActive(true);
         if (ReadyButton != null)
             ReadyButton.gameObject.SetActive(true);
 
-        // Namen-Anzeige explizit aktivieren (oben links/rechts)
+        // Namensanzeige aktivieren + Initialwerte setzen
         if (player1NameText != null)
+        {
             player1NameText.gameObject.SetActive(true);
-        if (player2NameText != null)
-            player2NameText.gameObject.SetActive(true);
-
-        // FIX: Initialwerte direkt einmal setzen (falls OnChange schon vorher passiert ist)
-        if (player1NameText != null)
             player1NameText.text = string.IsNullOrEmpty(Player1.Value) ? "Player 1" : Player1.Value;
-
+        }
         if (player2NameText != null)
+        {
+            player2NameText.gameObject.SetActive(true);
             player2NameText.text = string.IsNullOrEmpty(Player2.Value) ? "Player 2" : Player2.Value;
-
-        Debug.Log("Client connected - UI & Namen-Anzeige aktiviert!");
+        }
     }
 
-    // ────────────────────────────────────────────────
-    // Ready-Button Logik + UI ausblenden (FIXED)
-    // ────────────────────────────────────────────────
+    // Namen in UI anzeigen (wird bei SyncVar-Änderung aufgerufen)
     private void ApplyNameToUI(int index, string value)
     {
         string finalName = string.IsNullOrEmpty(value)
             ? (index == 1 ? "Player 1" : "Player 2")
             : value;
 
-        if (index == 1)
-        {
-            if (player1NameText != null)
-                player1NameText.text = finalName;
-        }
-        else
-        {
-            if (player2NameText != null)
-                player2NameText.text = finalName;
-        }
+        if (index == 1 && player1NameText != null)
+            player1NameText.text = finalName;
+        else if (index == 2 && player2NameText != null)
+            player2NameText.text = finalName;
     }
 
-
+    // Wird von Ready-Button aufgerufen (Client-seitig)
     public void SetPlayerReady()
     {
-        // lokalen Owner-Player finden
+        // Lokalen OwnPlayer finden
         var localPlayer = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None)
             .FirstOrDefault(p => p.IsOwner);
 
-        if (localPlayer == null)
+        if (localPlayer == null || localPlayer.IsReady)
             return;
 
-        // Wenn schon ready: nichts mehr machen (UI ist eh weg)
-        if (localPlayer.IsReady)
-            return;
-
-        // Optional: Button-Farbe (rein lokal)
+        // Button optisch bestätigen (lokal)
         if (ReadyButton != null)
             ReadyButton.image.color = Color.green;
 
-        // FIX: Ready serverseitig setzen + Namen setzen
+        // Namen und Ready-State serverseitig setzen
         localPlayer.SetReadyStateServerRpc(PlayerNameField != null ? PlayerNameField.text : "");
-
-        // FIX: CmdSetReady NICHT togglen (sonst hängt es am alten SyncVar-Wert)
         localPlayer.CmdSetReady(true);
 
-        // FIX: UI immer ausblenden nachdem ready gedrückt wurde
-        DisableReadyUIForThisPlayer();
+        // Ready-UI deaktivieren/ausblenden
+        DisableReadyUIForThisClient();
     }
 
-    private void DisableReadyUIForThisPlayer()
+    // Ready-UI für diesen Client ausblenden und deaktivieren
+    private void DisableReadyUIForThisClient()
     {
         if (PlayerNameField != null)
         {
@@ -161,48 +145,43 @@ public class OwnNetworkGameManager : NetworkBehaviour
             ReadyButton.interactable = false;
             ReadyButton.gameObject.SetActive(false);
         }
-
-        Debug.Log("Ready-UI für diesen Client ausgeblendet und deaktiviert");
     }
 
-    // ────────────────────────────────────────────────
-    // Rest des Skripts (unverändert)
-    // ────────────────────────────────────────────────
-    public void OnPlayerDied(int clientId)
-    {
-        Debug.Log($"Player {clientId} has died! Game Over for this player!");
-        // Hier später: Check ob beide tot sind, dann komplett Game Over
-    }
-
+    // Server: Prüft, ob beide Spieler bereit → startet Spiel
     [Server]
     public void CheckAndStartGame()
     {
-        if (CurrentState != GameState.WaitingForPlayers) return;
+        if (CurrentState != GameState.WaitingForPlayers)
+            return;
+
         var players = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None);
         if (players.Length >= 2 && players.All(p => p.IsReady))
         {
             gameState.Value = GameState.Playing;
-            Debug.Log("Game started! Spawning enemies...");
+            // Enemy-Wellen starten
             if (EnemySpawner.Instance != null)
-            {
                 EnemySpawner.Instance.StartWave();
-                Debug.Log("EnemySpawner.StartWave() called!");
-            }
-            else
-            {
-                Debug.LogError("EnemySpawner.Instance is NULL!");
-            }
         }
     }
 
+    // Spieler gestorben (Game Over für diesen Spieler)
+    public void OnPlayerDied(int clientId)
+    {
+        // TODO: Prüfen ob beide tot → Game Over
+    }
+
+    // Zustandsänderung → UI updaten
     private void OnStateChanged(GameState oldState, GameState newState, bool asServer)
     {
         UpdateStateText();
     }
 
+    // Status-Text aktualisieren (Score oder Wartezustand)
     private void UpdateStateText()
     {
-        if (stateText == null) return;
+        if (stateText == null)
+            return;
+
         switch (gameState.Value)
         {
             case GameState.WaitingForPlayers:
@@ -217,28 +196,31 @@ public class OwnNetworkGameManager : NetworkBehaviour
         }
     }
 
+    // Server: Punkt für Spieler vergeben
     [Server]
     public void ScorePoint(int playerIndex)
     {
-        if (gameState.Value != GameState.Playing) return;
+        if (gameState.Value != GameState.Playing)
+            return;
+
+        // Score erhöhen
         if (playerIndex == 0)
             scoreP1.Value++;
         else if (playerIndex == 1)
             scoreP2.Value++;
+
+        // Spielende bei 10 Punkten
         if (scoreP1.Value >= 10 || scoreP2.Value >= 10)
-        {
             gameState.Value = GameState.Finished;
-        }
         else
-        {
-            StartCoroutine(OwnBallSpawner.Instance.SpawnBall(6f));
-        }
+            StartCoroutine(OwnBallSpawner.Instance.SpawnBall(6f));  // Nächste Runde
     }
 }
 
+// Spielzustände
 public enum GameState
 {
-    WaitingForPlayers,
-    Playing,
-    Finished
+    WaitingForPlayers,  // Warten auf 2 ready Spieler
+    Playing,            // Spiel läuft (Enemies spawnen)
+    Finished            // Ein Spieler hat 10 Punkte erreicht
 }
