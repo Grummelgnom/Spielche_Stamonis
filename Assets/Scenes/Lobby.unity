@@ -455,7 +455,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6613cc6e74ad2ef41bb9e23f45afe872, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  controlsButton: {fileID: 0}
+  controlsButton: {fileID: 834425767}
 --- !u!4 &706682762
 Transform:
   m_ObjectHideFlags: 0
