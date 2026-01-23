@@ -46,6 +46,7 @@ namespace FishNet.Example
         [Tooltip("Color when socket is started.")]
         [SerializeField]
         private Color _startedColor;
+
         [Header("Indicators")]
         /// <summary>
         /// Indicator for server state.
@@ -80,11 +81,28 @@ namespace FishNet.Example
         /// </summary>
         private EventSystem _eventSystem;
 #endif
+
+        /// <summary>
+        /// Wenn true, werden die Start-Buttons nicht mehr gezeichnet.
+        /// </summary>
+        private bool _hideStartButtons = false;
         #endregion
+
+        /// <summary>
+        /// Von außen aufrufbar, um die Server/Client-Buttons auszublenden,
+        /// ohne das gesamte HUD zu deaktivieren.
+        /// </summary>
+        public void HideStartButtons()
+        {
+            _hideStartButtons = true;
+        }
 
         private void OnGUI()
         {
 #if ENABLE_INPUT_SYSTEM
+            if (_hideStartButtons)
+                return; // Buttons sind "versteckt", restliches Canvas bleibt
+
             string GetNextStateText(LocalConnectionState state)
             {
                 if (state == LocalConnectionState.Stopped)
@@ -101,24 +119,35 @@ namespace FishNet.Example
 
             GUILayout.BeginArea(new Rect(4, 110, 256, 9000));
             Vector2 defaultResolution = new Vector2(1920f, 1080f);
-            GUI.matrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(Screen.width / defaultResolution.x, Screen.height / defaultResolution.y, 1));
+            GUI.matrix = Matrix4x4.TRS(
+                Vector3.zero,
+                Quaternion.identity,
+                new Vector3(Screen.width / defaultResolution.x, Screen.height / defaultResolution.y, 1)
+            );
 
             GUIStyle style = GUI.skin.GetStyle("button");
             int originalFontSize = style.fontSize;
 
             Vector2 buttonSize = new Vector2(165f, 42f);
             style.fontSize = 26;
+
             // Server button.
             if (Application.platform != RuntimePlatform.WebGLPlayer)
             {
-                if (GUILayout.Button($"{GetNextStateText(_serverState)} Server", GUILayout.Width(buttonSize.x), GUILayout.Height(buttonSize.y)))
+                if (GUILayout.Button($"{GetNextStateText(_serverState)} Server",
+                    GUILayout.Width(buttonSize.x), GUILayout.Height(buttonSize.y)))
+                {
                     OnClick_Server();
+                }
                 GUILayout.Space(10f);
             }
 
             // Client button.
-            if (GUILayout.Button($"{GetNextStateText(_clientState)} Client", GUILayout.Width(buttonSize.x), GUILayout.Height(buttonSize.y)))
+            if (GUILayout.Button($"{GetNextStateText(_clientState)} Client",
+                GUILayout.Width(buttonSize.x), GUILayout.Height(buttonSize.y)))
+            {
                 OnClick_Client();
+            }
 
             style.fontSize = originalFontSize;
 
@@ -170,8 +199,6 @@ namespace FishNet.Example
         /// <summary>
         /// Updates img color baased on state.
         /// </summary>
-        /// <param name = "state"></param>
-        /// <param name = "img"></param>
         private void UpdateColor(LocalConnectionState state, ref Image img)
         {
             Color c;

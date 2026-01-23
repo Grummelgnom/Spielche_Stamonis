@@ -158,11 +158,25 @@ public class OwnNetworkGameManager : NetworkBehaviour
         if (players.Length >= 2 && players.All(p => p.IsReady))
         {
             gameState.Value = GameState.Playing;
-            // Enemy-Wellen starten
+
+            HideFishNetStartButtonsObserversRpc();
+
             if (EnemySpawner.Instance != null)
                 EnemySpawner.Instance.StartWave();
         }
     }
+
+    [ObserversRpc]
+    private void HideFishNetStartButtonsObserversRpc()
+    {
+        var huds = FindObjectsByType<FishNet.Example.NetworkHudCanvases>(FindObjectsSortMode.None);
+        foreach (var hud in huds)
+        {
+            if (hud != null)
+                hud.HideStartButtons();
+        }
+    }
+
 
     // Spieler gestorben (Game Over für diesen Spieler)
     public void OnPlayerDied(int clientId)
