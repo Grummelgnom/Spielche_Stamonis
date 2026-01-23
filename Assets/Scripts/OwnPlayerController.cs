@@ -95,10 +95,18 @@ public class OwnPlayerController : NetworkBehaviour
     private IEnumerator DelayedIsOwner()
     {
         playerRenderer = GetComponentInChildren<Renderer>();
-        if (playerRenderer != null) { playerRenderer.material = new Material(playerRenderer.material); playerRenderer.material.color = playerColor.Value; }
+        if (playerRenderer != null)
+        {
+            playerRenderer.material = new Material(playerRenderer.material);
+            playerRenderer.material.color = playerColor.Value;
+        }
+
         var pi = GetComponent<PlayerInput>();
-        if (playerIndexText != null && pi != null) playerIndexText.text = $"Player {pi.playerIndex}";
+        if (playerIndexText != null && pi != null)
+            playerIndexText.text = $"Player {pi.playerIndex}";
+
         yield return null;
+
         if (IsOwner)
         {
             ChangeColorServerRpc(Random.value, Random.value, Random.value);
@@ -116,21 +124,40 @@ public class OwnPlayerController : NetworkBehaviour
     private void OnTick()
     {
         if (!IsOwner) return;
-        if (isReady.Value) { HandleInput(); HandleShooting(); }
-        else CheckForChangeColor();
+        if (isReady.Value)
+        {
+            HandleInput();
+            HandleShooting();
+        }
+        else
+        {
+            CheckForChangeColor();
+        }
     }
 
+    // FIX: Slot-Zuordnung über ClientId, kein Toggle mehr.
     [ServerRpc]
     public void SetReadyStateServerRpc(string name)
     {
-        isReady.Value = !isReady.Value;
-        if (transform.position.x < 0) OwnNetworkGameManager.Instance.Player1.Value = name;
-        else OwnNetworkGameManager.Instance.Player2.Value = name;
+        // Nicht mehr toggeln, sondern einmalig ready setzen
+        isReady.Value = true;
+
+        if (OwnNetworkGameManager.Instance == null)
+            return;
+
+        // Slot-Zuordnung stabil über ClientId:
+        // Host/erster Spieler = Player1, zweiter Spieler = Player2
+        if (Owner.ClientId == 0)
+            OwnNetworkGameManager.Instance.Player1.Value = name;
+        else
+            OwnNetworkGameManager.Instance.Player2.Value = name;
+
         OwnNetworkGameManager.Instance.CheckAndStartGame();
-        
     }
 
-    [ServerRpc] public void CmdSetReady(bool ready) { isReady.Value = ready; }
+
+    [ServerRpc]
+    public void CmdSetReady(bool ready) { isReady.Value = ready; }
 
     [ServerRpc]
     private void MoveServerRpc(Vector2 input)

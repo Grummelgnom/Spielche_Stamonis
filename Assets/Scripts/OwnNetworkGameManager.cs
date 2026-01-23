@@ -1,7 +1,6 @@
 ﻿using FishNet.Connection;
 using FishNet.Object;
 using FishNet.Object.Synchronizing;
-using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
@@ -19,6 +18,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
     [SerializeField] private TMP_InputField PlayerNameField;
     [SerializeField] private Button ReadyButton;
 
+    // Diese SyncVars bleiben: Player1 links, Player2 rechts
     public readonly SyncVar<string> Player1 = new SyncVar<string>();
     public readonly SyncVar<string> Player2 = new SyncVar<string>();
 
@@ -33,7 +33,7 @@ public class OwnNetworkGameManager : NetworkBehaviour
     private void Awake()
     {
         if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        else { Destroy(gameObject); return; }
 
         gameState.OnChange += OnStateChanged;
         scoreP1.OnChange += (oldVal, newVal, asServer) => UpdateStateText();
@@ -41,14 +41,12 @@ public class OwnNetworkGameManager : NetworkBehaviour
 
         Player1.OnChange += (oldVal, newVal, asServer) =>
         {
-            if (player1NameText != null)
-                player1NameText.text = string.IsNullOrEmpty(newVal) ? "Player 1" : newVal;
+            ApplyNameToUI(1, newVal);
         };
 
         Player2.OnChange += (oldVal, newVal, asServer) =>
         {
-            if (player2NameText != null)
-                player2NameText.text = string.IsNullOrEmpty(newVal) ? "Player 2" : newVal;
+            ApplyNameToUI(2, newVal);
         };
     }
 
@@ -62,18 +60,18 @@ public class OwnNetworkGameManager : NetworkBehaviour
 
     private void Start()
     {
-        // Verstecke Eingabe-UI bis verbunden
+        // unverändert …
         if (PlayerNameField != null)
             PlayerNameField.gameObject.SetActive(false);
         if (ReadyButton != null)
             ReadyButton.gameObject.SetActive(false);
 
-        // Namen-Anzeige oben immer sichtbar halten
         if (player1NameText != null)
             player1NameText.gameObject.SetActive(true);
         if (player2NameText != null)
             player2NameText.gameObject.SetActive(true);
     }
+
 
     public override void OnStartClient()
     {
@@ -91,35 +89,63 @@ public class OwnNetworkGameManager : NetworkBehaviour
         if (player2NameText != null)
             player2NameText.gameObject.SetActive(true);
 
+        // FIX: Initialwerte direkt einmal setzen (falls OnChange schon vorher passiert ist)
+        if (player1NameText != null)
+            player1NameText.text = string.IsNullOrEmpty(Player1.Value) ? "Player 1" : Player1.Value;
+
+        if (player2NameText != null)
+            player2NameText.text = string.IsNullOrEmpty(Player2.Value) ? "Player 2" : Player2.Value;
+
         Debug.Log("Client connected - UI & Namen-Anzeige aktiviert!");
     }
 
     // ────────────────────────────────────────────────
-    // Ready-Button Logik + UI ausblenden
+    // Ready-Button Logik + UI ausblenden (FIXED)
     // ────────────────────────────────────────────────
+    private void ApplyNameToUI(int index, string value)
+    {
+        string finalName = string.IsNullOrEmpty(value)
+            ? (index == 1 ? "Player 1" : "Player 2")
+            : value;
+
+        if (index == 1)
+        {
+            if (player1NameText != null)
+                player1NameText.text = finalName;
+        }
+        else
+        {
+            if (player2NameText != null)
+                player2NameText.text = finalName;
+        }
+    }
+
+
     public void SetPlayerReady()
     {
-        foreach (var player in FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None))
-        {
-            if (player.IsOwner)
-            {
-                // Farbe des Buttons ändern (optisch)
-                if (!player.IsReady)
-                    ReadyButton.image.color = Color.green;
-                else
-                    ReadyButton.image.color = Color.white;
+        // lokalen Owner-Player finden
+        var localPlayer = FindObjectsByType<OwnPlayerController>(FindObjectsSortMode.None)
+            .FirstOrDefault(p => p.IsOwner);
 
-                // Ready-State setzen
-                player.SetReadyStateServerRpc(PlayerNameField.text);
-                player.CmdSetReady(!player.IsReady);
+        if (localPlayer == null)
+            return;
 
-                // Eingabe-UI ausblenden, wenn Ready wird
-                if (!player.IsReady)
-                {
-                    DisableReadyUIForThisPlayer();
-                }
-            }
-        }
+        // Wenn schon ready: nichts mehr machen (UI ist eh weg)
+        if (localPlayer.IsReady)
+            return;
+
+        // Optional: Button-Farbe (rein lokal)
+        if (ReadyButton != null)
+            ReadyButton.image.color = Color.green;
+
+        // FIX: Ready serverseitig setzen + Namen setzen
+        localPlayer.SetReadyStateServerRpc(PlayerNameField != null ? PlayerNameField.text : "");
+
+        // FIX: CmdSetReady NICHT togglen (sonst hängt es am alten SyncVar-Wert)
+        localPlayer.CmdSetReady(true);
+
+        // FIX: UI immer ausblenden nachdem ready gedrückt wurde
+        DisableReadyUIForThisPlayer();
     }
 
     private void DisableReadyUIForThisPlayer()
